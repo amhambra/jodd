@@ -25,13 +25,19 @@
 
 package jodd.http;
 
+import jodd.io.FastCharArrayWriter;
 import jodd.io.FileUtil;
+import jodd.io.StreamUtil;
 import jodd.io.upload.FileUpload;
+import jodd.net.MimeTypes;
+import jodd.util.ClassLoaderUtil;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -374,5 +380,52 @@ class HttpRequestTest {
 		request.headerRemove("key-test1");
 		assertFalse(request.headers.contains("key-test1"));
 		assertFalse(request.headers.contains("KEY-TEST1"));
+	}
+
+	@Test
+	void testBigRequest() throws IOException {
+		InputStream inputStream = ClassLoaderUtil.getResourceAsStream("/jodd/http/answer.json");
+
+		FastCharArrayWriter writter = StreamUtil.copy(inputStream);
+		String body = writter.toString();
+
+		HttpRequest httpRequest = HttpRequest.get("").body(body);
+
+		ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+		httpRequest.sendTo(outputStream);
+
+		String receivedBody = outputStream.toString();
+
+		int ndx = receivedBody.indexOf("{");
+		receivedBody = receivedBody.substring(ndx);
+
+		assertEquals(body, receivedBody);
+	}
+
+	@Test
+	void testHttpRequestSlash() {
+		HttpRequest request = HttpRequest.post("/");
+		request.contentType("application/x-www-form-urlencoded");
+		HttpRequest request1 = HttpRequest.readFrom(new ByteArrayInputStream(request.toByteArray()));
+
+		assertEquals(request.toString(), request1.toString());
+	}
+
+	@Test
+	void testHttpRequestReRead() {
+		HttpRequest request = HttpRequest.post("http://127.0.0.1:8086/test");
+		request.form("a", null);
+		request.form("b", "aaa");
+		HttpRequest request1 = HttpRequest.readFrom(new ByteArrayInputStream(request.toByteArray()));
+		assertEquals(request.toString(), request1.toString());
+	}
+
+	@Test
+	void testHttpRequestContentSetOrder() {
+		final HttpRequest request = HttpRequest.get("http://127.0.0.1:8086/test");
+
+		request.contentTypeJson().bodyText("{}");
+
+		assertEquals(MimeTypes.MIME_APPLICATION_JSON, request.mediaType());
 	}
 }

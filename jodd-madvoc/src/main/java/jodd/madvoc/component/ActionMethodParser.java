@@ -25,37 +25,37 @@
 
 package jodd.madvoc.component;
 
+import jodd.bridge.Packages;
+import jodd.introspector.Mapper;
+import jodd.introspector.MapperFunction;
+import jodd.introspector.MapperFunctionInstances;
 import jodd.madvoc.ActionConfig;
 import jodd.madvoc.ActionHandler;
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocException;
 import jodd.madvoc.MadvocUtil;
-import jodd.madvoc.ScopeType;
 import jodd.madvoc.config.ActionDefinition;
 import jodd.madvoc.config.ActionNames;
 import jodd.madvoc.config.ActionRuntime;
 import jodd.madvoc.config.MethodParam;
-import jodd.madvoc.config.RootPackages;
 import jodd.madvoc.config.ScopeData;
 import jodd.madvoc.filter.ActionFilter;
-import jodd.madvoc.injector.Target;
 import jodd.madvoc.interceptor.ActionInterceptor;
 import jodd.madvoc.meta.Action;
-import jodd.madvoc.meta.ActionAnnotation;
-import jodd.madvoc.meta.ActionAnnotationData;
+import jodd.madvoc.meta.ActionAnnotationValues;
 import jodd.madvoc.meta.Async;
-import jodd.madvoc.meta.DELETE;
+import jodd.madvoc.meta.Auth;
 import jodd.madvoc.meta.FilteredBy;
-import jodd.madvoc.meta.GET;
-import jodd.madvoc.meta.HEAD;
 import jodd.madvoc.meta.InterceptedBy;
 import jodd.madvoc.meta.MadvocAction;
-import jodd.madvoc.meta.OPTIONS;
-import jodd.madvoc.meta.PATCH;
-import jodd.madvoc.meta.POST;
-import jodd.madvoc.meta.PUT;
 import jodd.madvoc.meta.RenderWith;
-import jodd.madvoc.meta.TRACE;
+import jodd.madvoc.meta.method.DELETE;
+import jodd.madvoc.meta.method.GET;
+import jodd.madvoc.meta.method.HEAD;
+import jodd.madvoc.meta.method.OPTIONS;
+import jodd.madvoc.meta.method.PATCH;
+import jodd.madvoc.meta.method.POST;
+import jodd.madvoc.meta.method.PUT;
+import jodd.madvoc.meta.method.TRACE;
 import jodd.madvoc.path.ActionNamingStrategy;
 import jodd.madvoc.result.ActionResult;
 import jodd.madvoc.result.NoneActionResult;
@@ -93,6 +93,9 @@ public class ActionMethodParser {
 	protected ContextInjectorComponent contextInjectorComponent;
 
 	@PetiteInject
+	protected ActionConfigManager actionConfigManager;
+
+	@PetiteInject
 	protected ActionsManager actionsManager;
 
 	@PetiteInject
@@ -102,10 +105,10 @@ public class ActionMethodParser {
 	protected FiltersManager filtersManager;
 
 	@PetiteInject
-	protected MadvocConfig madvocConfig;
+	protected RootPackages rootPackages;
 
 	@PetiteInject
-	protected ScopeDataResolver scopeDataResolver;
+	protected ScopeDataInspector scopeDataInspector;
 
 	@PetiteInject
 	protected ActionMethodParamNameResolver actionMethodParamNameResolver;
@@ -115,26 +118,26 @@ public class ActionMethodParser {
 	 */
 	public ActionDefinition parseActionDefinition(final Class<?> actionClass, final Method actionMethod) {
 
-		final ActionAnnotationData annotationData = detectActionAnnotationData(actionMethod);
+		final ActionAnnotationValues annotationValues = detectActionAnnotationValues(actionMethod);
 
-		final ActionConfig actionConfig = resolveActionConfig(annotationData);
+		final ActionConfig actionConfig = resolveActionConfig(annotationValues);
 
 		final String[] packageActionNames = readPackageActionPath(actionClass);
 
 		final String[] classActionNames = readClassActionPath(actionClass);
 
-		final String[] methodActionNames = readMethodActionPath(actionMethod.getName(), annotationData, actionConfig);
+		final String[] methodActionNames = readMethodActionPath(actionMethod.getName(), annotationValues, actionConfig);
 
 		final String method = readMethodHttpMethod(actionMethod);
 
 		final ActionNames actionNames = new ActionNames(packageActionNames, classActionNames, methodActionNames, method);
 
-		ActionNamingStrategy namingStrategy;
+		final ActionNamingStrategy namingStrategy;
 
 		try {
 			namingStrategy = ClassUtil.newInstance(actionConfig.getNamingStrategy());
 
-			contextInjectorComponent.injectContext(new Target(namingStrategy));
+			contextInjectorComponent.injectContext(namingStrategy);
 		} catch (Exception ex) {
 			throw new MadvocException(ex);
 		}
@@ -150,9 +153,9 @@ public class ActionMethodParser {
 	 * @param actionDefinition optional action def, usually <code>null</code> so to be parsed
 	 */
 	public ActionRuntime parse(final Class<?> actionClass, final Method actionMethod, ActionDefinition actionDefinition) {
-		final ActionAnnotationData annotationData = detectActionAnnotationData(actionMethod);
+		final ActionAnnotationValues annotationValues = detectActionAnnotationValues(actionMethod);
 
-		final ActionConfig actionConfig = resolveActionConfig(annotationData);
+		final ActionConfig actionConfig = resolveActionConfig(annotationValues);
 
 		// interceptors
 		ActionInterceptor[] actionInterceptors = parseActionInterceptors(actionClass, actionMethod, actionConfig);
@@ -165,48 +168,55 @@ public class ActionMethodParser {
 			actionDefinition = parseActionDefinition(actionClass, actionMethod);
 		}
 
-		detectAndRegisterAlias(annotationData, actionDefinition);
+		detectAndRegisterAlias(annotationValues, actionDefinition);
 
 		final boolean async = parseMethodAsyncFlag(actionMethod);
 
+		final boolean auth = parseMethodAuthFlag(actionMethod);
+
 		final Class<? extends ActionResult> actionResult = parseActionResult(actionMethod);
+		final Class<? extends ActionResult> defaultActionResult = actionConfig.getActionResult();
 
 		return createActionRuntime(
-				null,
-				actionClass, actionMethod,
-				actionResult,
-				actionFilters, actionInterceptors,
-				actionDefinition,
-				async,
-				actionConfig);
+			null,
+			actionClass,
+			actionMethod,
+			actionResult,
+			defaultActionResult,
+			actionFilters,
+			actionInterceptors,
+			actionDefinition,
+			async,
+			auth);
 	}
 
 	/**
 	 * Resolves action config.
 	 */
-	protected ActionConfig resolveActionConfig(final ActionAnnotationData annotationData) {
-		return madvocConfig.lookupActionConfig(annotationData);
+	protected ActionConfig resolveActionConfig(final ActionAnnotationValues annotationValues) {
+		final Class<? extends Annotation> annotationType;
+
+		if (annotationValues == null) {
+			annotationType = Action.class;
+		}
+		else {
+			annotationType = annotationValues.annotationType();
+		}
+		return actionConfigManager.lookup(annotationType);
 	}
 
 	/**
-	 * Detects {@link jodd.madvoc.meta.ActionAnnotationData}.
+	 * Detects {@link jodd.madvoc.meta.ActionAnnotationValues}. Returns {@code null} if annotation does not exist.
 	 */
-	protected ActionAnnotationData detectActionAnnotationData(final Method actionMethod) {
-		ActionAnnotationData annotationData = null;
-		for (ActionAnnotation actionAnnotation : madvocConfig.getActionAnnotationInstances()) {
-			annotationData = actionAnnotation.readAnnotatedElement(actionMethod);
-			if (annotationData != null) {
-				break;
-			}
-		}
-		return annotationData;
+	protected ActionAnnotationValues detectActionAnnotationValues(final Method actionMethod) {
+		return actionConfigManager.readAnnotationValue(actionMethod);
 	}
 
 	/**
 	 * Detects if alias is defined in annotation and registers it if so.
 	 */
-	protected void detectAndRegisterAlias(final ActionAnnotationData annotationData, final ActionDefinition actionDefinition) {
-		final String alias = parseMethodAlias(annotationData);
+	protected void detectAndRegisterAlias(final ActionAnnotationValues annotationValues, final ActionDefinition actionDefinition) {
+		final String alias = parseMethodAlias(annotationValues);
 
 		if (alias != null) {
 			String aliasPath = StringUtil.cutToIndexOf(actionDefinition.actionPath(), StringPool.HASH);
@@ -215,7 +225,7 @@ public class ActionMethodParser {
 	}
 
 	protected Class<? extends ActionResult> parseActionResult(final Method actionMethod) {
-		RenderWith renderWith = actionMethod.getAnnotation(RenderWith.class);
+		final RenderWith renderWith = actionMethod.getAnnotation(RenderWith.class);
 
 		if (renderWith != null) {
 			return renderWith.value();
@@ -233,7 +243,7 @@ public class ActionMethodParser {
 			interceptorClasses = actionConfig.getInterceptors();
 		}
 
-		return interceptorsManager.resolveAll(actionConfig, interceptorClasses);
+		return interceptorsManager.resolveAll(interceptorClasses);
 	}
 
 	protected ActionFilter[] parseActionFilters(final Class<?> actionClass, final Method actionMethod, final ActionConfig actionConfig) {
@@ -245,7 +255,7 @@ public class ActionMethodParser {
 			filterClasses = actionConfig.getFilters();
 		}
 
-		return filtersManager.resolveAll(actionConfig, filterClasses);
+		return filtersManager.resolveAll(filterClasses);
 	}
 
 	// ---------------------------------------------------------------- interceptors
@@ -285,8 +295,7 @@ public class ActionMethodParser {
 	// ---------------------------------------------------------------- readers
 
 	/**
-	 * Reads action path for package. It can be used only if root package is set in
-	 * {@link MadvocConfig madvoc configuration}.
+	 * Reads action path for package.
 	 * If annotation is not set on package-level, class package will be used for
 	 * package action path part.
 	 */
@@ -294,7 +303,6 @@ public class ActionMethodParser {
 		Package actionPackage = actionClass.getPackage();
 
 		final String actionPackageName = actionPackage.getName();
-		final RootPackages rootPackages = madvocConfig.getRootPackages();
 
 		// 1 - read annotations first
 
@@ -316,13 +324,13 @@ public class ActionMethodParser {
 				actionPackage = null;
 
 				while (actionPackage == null) {
-					int ndx = newPackage.lastIndexOf('.');
+					final int ndx = newPackage.lastIndexOf('.');
 					if (ndx == -1) {
 						// end of hierarchy, nothing found
 						break mainloop;
 					}
 					newPackage = newPackage.substring(0, ndx);
-					actionPackage = Package.getPackage(newPackage);
+					actionPackage = Packages.of(actionClass.getClassLoader(), newPackage);
 				}
 			}
 			else {
@@ -376,9 +384,9 @@ public class ActionMethodParser {
 	/**
 	 * Reads action path from the action method.
 	 */
-	protected String[] readMethodActionPath(final String methodName, final ActionAnnotationData annotationData, final ActionConfig actionConfig) {
+	protected String[] readMethodActionPath(final String methodName, final ActionAnnotationValues annotationValues, final ActionConfig actionConfig) {
 		// read annotation
-		String methodActionPath = annotationData != null ? annotationData.value() : null;
+		String methodActionPath = annotationValues != null ? annotationValues.value() : null;
 
 		if (methodActionPath == null) {
 			methodActionPath = methodName;
@@ -402,10 +410,10 @@ public class ActionMethodParser {
 	/**
 	 * Reads method's alias value.
 	 */
-	protected String parseMethodAlias(final ActionAnnotationData annotationData) {
+	protected String parseMethodAlias(final ActionAnnotationValues annotationValues) {
 		String alias = null;
-		if (annotationData != null) {
-			alias = annotationData.alias();
+		if (annotationValues != null) {
+			alias = annotationValues.alias();
 		}
 		return alias;
 	}
@@ -430,6 +438,20 @@ public class ActionMethodParser {
 		return actionMethod.getAnnotation(Async.class) != null;
 	}
 
+	private boolean parseMethodAuthFlag(final Method actionMethod) {
+		if (actionMethod.getAnnotation(Auth.class) != null) {
+			return true;
+		}
+		final Class declaringClass = actionMethod.getDeclaringClass();
+		if (declaringClass.getAnnotation(Auth.class) != null) {
+			return true;
+		}
+		if (declaringClass.getPackage().getAnnotation(Auth.class) != null) {
+			return true;
+		}
+		return false;
+	}
+
 	// ---------------------------------------------------------------- create action runtime
 
 	/**
@@ -441,11 +463,12 @@ public class ActionMethodParser {
 		final Class actionClass,
 		final Method actionClassMethod,
 		final Class<? extends ActionResult> actionResult,
+		final Class<? extends ActionResult> defaultActionResult,
 		final ActionFilter[] filters,
 		final ActionInterceptor[] interceptors,
 		final ActionDefinition actionDefinition,
 		final boolean async,
-		final ActionConfig actionConfig)
+		final boolean auth)
 	{
 		if (actionHandler != null) {
 
@@ -457,63 +480,55 @@ public class ActionMethodParser {
 				interceptors,
 				actionDefinition,
 				NoneActionResult.class,
+				NoneActionResult.class,
 				async,
+				auth,
 				null,
-				null,
-				actionConfig);
+				null);
 
 		}
-		// 1) find ins and outs
 
-		Class[] paramTypes = actionClassMethod.getParameterTypes();
-		MethodParam[] params = new MethodParam[paramTypes.length];
+		final ScopeData scopeData = scopeDataInspector.inspectClassScopes(actionClass);
 
-		Annotation[][] paramAnns = actionClassMethod.getParameterAnnotations();
+		// find ins and outs
+
+		final Class[] paramTypes = actionClassMethod.getParameterTypes();
+		final MethodParam[] params = new MethodParam[paramTypes.length];
+
+		final Annotation[][] paramAnns = actionClassMethod.getParameterAnnotations();
 		String[] methodParamNames = null;
 
-		// expand arguments array with action itself, on first position
-		Class[] types = ArraysUtil.insert(paramTypes, actionClass, 0);
-
-		ScopeData[][] allScopeData = new ScopeData[ScopeType.values().length][];
 
 		// for all elements: action and method arguments...
-		for (int i = 0; i < types.length; i++) {
-			Class type = types[i];
+		for (int ndx = 0; ndx < paramTypes.length; ndx++) {
+			Class paramType = paramTypes[ndx];
 
-			ScopeData[] scopeData = null;
+			// lazy init to postpone bytecode usage, when method has no arguments
+			if (methodParamNames == null) {
+				methodParamNames = actionMethodParamNameResolver.resolveParamNames(actionClassMethod);
+			}
 
-			if (i > 0) {
-				// lazy init to postpone bytecode usage, when method has no arguments
-				if (methodParamNames == null) {
-					methodParamNames = actionMethodParamNameResolver.resolveParamNames(actionClassMethod);
+			final String paramName = methodParamNames[ndx];
+
+			final Annotation[] parameterAnnotations = paramAnns[ndx];
+
+			final ScopeData paramsScopeData = scopeDataInspector.inspectMethodParameterScopes(paramName, paramType, parameterAnnotations);
+
+			MapperFunction mapperFunction = null;
+			for (final Annotation annotation : parameterAnnotations) {
+				if (annotation instanceof Mapper) {
+					mapperFunction = MapperFunctionInstances.get().lookup(((Mapper) annotation).value());
+					break;
 				}
-
-				int paramIndex = i - 1;
-
-				String paramName = methodParamNames[paramIndex];
-
-				scopeData = scopeDataResolver.resolveScopeData(paramName, type, paramAnns[paramIndex]);
-
-				params[paramIndex] = new MethodParam(
-						paramTypes[paramIndex], paramName, scopeDataResolver.detectAnnotationType(paramAnns[paramIndex]));
 			}
 
-			if (scopeData == null) {
-				// read annotations inside the type for all scope types
-				scopeData = scopeDataResolver.resolveScopeData(type);
-			}
-
-			if (scopeData == null) {
-				continue;
-			}
-
-			// for all scope types... merge
-			for (int j = 0; j < ScopeType.values().length; j++) {
-				if (allScopeData[j] == null) {
-					allScopeData[j] = new ScopeData[types.length];
-				}
-				allScopeData[j][i] = scopeData[j];
-			}
+			params[ndx] = new MethodParam(
+				paramTypes[ndx],
+				paramName,
+				scopeDataInspector.detectAnnotationType(parameterAnnotations),
+				paramsScopeData,
+				mapperFunction
+			);
 		}
 
 		return new ActionRuntime(
@@ -524,10 +539,11 @@ public class ActionMethodParser {
 				interceptors,
 				actionDefinition,
 				actionResult,
+				defaultActionResult,
 				async,
-				allScopeData,
-				params,
-				actionConfig);
+				auth,
+				scopeData,
+				params);
 	}
 
 }

@@ -25,8 +25,9 @@
 
 package jodd.vtor;
 
-import jodd.bean.JoddBean;
+import jodd.cache.TypeCache;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.FieldDescriptor;
 import jodd.introspector.MethodDescriptor;
 import jodd.introspector.PropertyDescriptor;
@@ -59,11 +60,7 @@ public class ValidationContext {
 	 */
 	public void add(final Check check) {
 		String name = check.getName();
-		List<Check> list = map.get(name);
-		if (list == null) {
-			list = new ArrayList<>();
-			map.put(name, list);
-		}
+		List<Check> list = map.computeIfAbsent(name, k -> new ArrayList<>());
 		list.add(check);
 	}
 
@@ -79,7 +76,7 @@ public class ValidationContext {
 
 	// ---------------------------------------------------------------- annotation resolver
 
-	private static Map<Class, List<Check>> cache = new HashMap<>();
+	public static TypeCache<List<Check>> cache = TypeCache.createDefault();
 
 	/**
 	 * Resolve validation context for provided target class.
@@ -96,18 +93,15 @@ public class ValidationContext {
 	 * @see #resolveFor(Class)
 	 */
 	public void addClassChecks(final Class target) {
-		List<Check> list = cache.get(target);
-		if (list == null) {
-			list = new ArrayList<>();
-			ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(target);
-
-			PropertyDescriptor[] allProperties = cd.getAllPropertyDescriptors();
+		final List<Check> list = cache.get(target, () -> {
+			final List<Check> newList = new ArrayList<>();
+			final ClassDescriptor cd = ClassIntrospector.get().lookup(target);
+			final PropertyDescriptor[] allProperties = cd.getAllPropertyDescriptors();
 			for (PropertyDescriptor propertyDescriptor : allProperties) {
-				collectPropertyAnnotationChecks(list, propertyDescriptor);
+				collectPropertyAnnotationChecks(newList, propertyDescriptor);
 			}
-
-			cache.put(target, list);
-		}
+			return newList;
+		});
 		addAll(list);
 	}
 
@@ -190,7 +184,6 @@ public class ValidationContext {
 			return ctor.newInstance(resolveFor(targetType));
 		}
 	}
-
 
 
 	/**

@@ -25,7 +25,7 @@
 
 package jodd.madvoc.meta;
 
-import jodd.madvoc.ActionConfig;
+import jodd.madvoc.action.DefaultActionConfig;
 import jodd.util.StringPool;
 
 import java.lang.annotation.Documented;
@@ -38,12 +38,12 @@ import java.lang.annotation.Target;
  * Marker for action methods. It is not necessary to mark a method, however, this annotation 
  * may be used to specify non-default action path. Moreover, this annotation may be used
  * to mark custom annotations!
- * @see jodd.madvoc.meta.ActionAnnotationData
+ * @see ActionAnnotationValues
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
-@ActionConfiguredBy(ActionConfig.class)
+@ActionConfiguredBy(DefaultActionConfig.class)
 public @interface Action {
 
 	/**

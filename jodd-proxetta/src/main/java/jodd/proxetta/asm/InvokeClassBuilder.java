@@ -26,8 +26,8 @@
 package jodd.proxetta.asm;
 
 import jodd.asm.ClassAdapter;
-import jodd.asm6.ClassVisitor;
-import jodd.asm6.MethodVisitor;
+import jodd.asm7.ClassVisitor;
+import jodd.asm7.MethodVisitor;
 import jodd.proxetta.InvokeAspect;
 
 import java.util.ArrayList;
@@ -67,7 +67,8 @@ public class InvokeClassBuilder extends ClassAdapter {
 		wd.init(name, superName, suffix, reqProxyClassName);
 
 		// write destination class
-		super.visit(version, access, wd.thisReference, signature, wd.superName, interfaces);
+		final int v = ProxettaAsmUtil.resolveJavaVersion(version);
+		super.visit(v, access, wd.thisReference, signature, wd.superName, interfaces);
 	}
 
 	@Override

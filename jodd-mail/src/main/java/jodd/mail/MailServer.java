@@ -27,47 +27,97 @@ package jodd.mail;
 
 import javax.mail.Authenticator;
 import javax.mail.Session;
+import java.io.File;
 import java.util.Objects;
 import java.util.Properties;
 
 public abstract class MailServer<MailSessionImpl extends MailSession> {
 
+	public static final String MAIL_HOST = "mail.host";
+	public static final String MAIL_SMTP_HOST = "mail.smtp.host";
+	public static final String MAIL_SMTP_PORT = "mail.smtp.port";
+	public static final String MAIL_SMTP_AUTH = "mail.smtp.auth";
+	public static final String MAIL_TRANSPORT_PROTOCOL = "mail.transport.protocol";
+	//public static final String MAIL_SMTP_FROM = "mail.smtp.from";
+
+	public static final String MAIL_SMTP_CONNECTIONTIMEOUT = "mail.smtp.connectiontimeout";
+	public static final String MAIL_SMTP_TIMEOUT = "mail.smtp.timeout";
+	public static final String MAIL_SMTP_WRITETIMEOUT = "mail.smtp.writetimeout";
+	public static final String MAIL_DEBUG = "mail.debug";
+	public static final String MAIL_MIME_ADDRESS_STRICT = "mail.mime.address.strict";
+
+	public static final String MAIL_IMAP_CONNECTIONTIMEOUT = "mail.imap.connectiontimeout";
+	public static final String MAIL_IMAP_TIMEOUT = "mail.imap.timeout";
+	public static final String MAIL_IMAP_PORT = "mail.imap.port";
+	public static final String MAIL_IMAP_HOST = "mail.imap.host";
+	public static final String MAIL_IMAP_PARTIALFETCH = "mail.imap.partialfetch";
+
+	public static final String MAIL_IMAP_SOCKET_FACTORY_PORT = "mail.imap.socketFactory.port";
+	public static final String MAIL_IMAP_SOCKET_FACTORY_CLASS = "mail.imap.socketFactory.class";
+	public static final String MAIL_IMAP_SOCKET_FACTORY_FALLBACK = "mail.imap.socketFactory.fallback";
+
+	public static final String MAIL_SMTP_STARTTLS_REQUIRED = "mail.smtp.starttls.required";
+	public static final String MAIL_SMTP_STARTTLS_ENABLE = "mail.smtp.starttls.enable";
+	public static final String MAIL_SMTP_SOCKET_FACTORY_PORT = "mail.smtp.socketFactory.port";
+	public static final String MAIL_SMTP_SOCKET_FACTORY_CLASS = "mail.smtp.socketFactory.class";
+	public static final String MAIL_SMTP_SOCKET_FACTORY_FALLBACK = "mail.smtp.socketFactory.fallback";
+
+	public static final String MAIL_POP3_PORT = "mail.pop3.port";
+	public static final String MAIL_POP3_HOST = "mail.pop3.host";
+	public static final String MAIL_POP3_AUTH = "mail.pop3.auth";
+	public static final String MAIL_POP3_CONNECTIONTIMEOUT = "mail.pop3.connectiontimeout";
+	public static final String MAIL_POP3_TIMEOUT = "mail.pop3.timeout";
+
+	public static final String MAIL_POP3_SOCKET_FACTORY_PORT = "mail.pop3.socketFactory.port";
+	public static final String MAIL_POP3_SOCKET_FACTORY_CLASS = "mail.pop3.socketFactory.class";
+	public static final String MAIL_POP3_SOCKET_FACTORY_FALLBACK = "mail.pop3.socketFactory.fallback";
+
 	/**
 	 * The host.
 	 */
-	private final String host;
+	protected final String host;
 
 	/**
 	 * The port.
 	 */
-	private final int port;
+	protected final int port;
 
 	/**
 	 * The {@link Authenticator}.
 	 */
-	private final Authenticator authenticator;
+	protected final Authenticator authenticator;
+
+	protected final File attachmentStorage;
+
+	protected final boolean debugMode;
 
 	/**
-	 * The {@link MailSession} {@link Properties}.
+	 * Whether strict address checking is turned on.
 	 */
-	private final Properties sessionProperties;
+	protected final boolean strictAddress;
+
+	/**
+	 * Connection timeout.
+	 */
+	protected final int timeout;
+
+	protected final Properties customProperties;
 
 	/**
 	 * {@link MailServer} defined with its host, port and {@link Authenticator}.
-	 *
-	 * @param host          The host to use.
-	 * @param port          The port to use.
-	 * @param authenticator The {@link Authenticator} to use.
 	 */
-	protected MailServer(final String host, final int port, final Authenticator authenticator) {
-		Objects.requireNonNull(host, "Host cannot be null");
+	protected MailServer(final Builder builder, final int defaultPort) {
+		Objects.requireNonNull(builder.host, "Host cannot be null");
 
-		this.host = host;
-		this.port = port;
-		this.authenticator = authenticator;
-		this.sessionProperties = createSessionProperties();
+		this.host = builder.host;
+		this.port = builder.port == -1 ? defaultPort : builder.port;
+		this.authenticator = builder.authenticator;
+		this.attachmentStorage = builder.attachmentStorage;
+		this.timeout = builder.timeout;
+		this.strictAddress = builder.strictAddress;
+		this.debugMode = builder.debug;
+		this.customProperties = builder.customProperties;
 	}
-
 
 	/**
 	 * Creates new mail session.
@@ -83,44 +133,20 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 	 *
 	 * @return session {@link Properties}
 	 */
-	protected abstract Properties createSessionProperties();
+	protected Properties createSessionProperties() {
+		final Properties props = new Properties();
 
-	// ---------------------------------------------------------------- properties
+		props.putAll(customProperties);
 
-	/**
-	 * Returns the host.
-	 *
-	 * @return The host.
-	 */
-	public String getHost() {
-		return host;
-	}
+		if (debugMode) {
+			props.put(MAIL_DEBUG, "true");
+		}
 
-	/**
-	 * Returns the {@link Authenticator}.
-	 *
-	 * @return The current {@link Authenticator}.
-	 */
-	public Authenticator getAuthenticator() {
-		return authenticator;
-	}
+		if (!strictAddress) {
+			props.put(MAIL_MIME_ADDRESS_STRICT, "false");
+		}
 
-	/**
-	 * Returns current port.
-	 *
-	 * @return The current port.
-	 */
-	public int getPort() {
-		return port;
-	}
-
-	/**
-	 * Returns {@link MailSession} {@link Properties}.
-	 *
-	 * @return The {@link MailSession} {@link Properties}.
-	 */
-	public Properties getSessionProperties() {
-		return sessionProperties;
+		return props;
 	}
 
 	/**
@@ -147,13 +173,17 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 		private int port = -1;
 		private boolean ssl = false;
 		private Authenticator authenticator;
+		private File attachmentStorage;
+		private boolean debug;
+		private int timeout = 0;
+		private boolean strictAddress = true;
+		private Properties customProperties = new Properties();
 
 		/**
 		 * Sets the host.
 		 *
 		 * @param host The host to set.
 		 * @return this
-		 *
 		 */
 		public Builder host(final String host) {
 			this.host = host;
@@ -184,6 +214,14 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 		}
 
 		/**
+		 * Defines attachment storage, a folder where attachments will be saved.
+		 */
+		public Builder storeAttachmentsIn(final File attachmentStorage) {
+			this.attachmentStorage = attachmentStorage;
+			return this;
+		}
+
+		/**
 		 * Sets authenticator as {@link SimpleAuthenticator} using username and password.
 		 *
 		 * @param username The username to use.
@@ -208,6 +246,45 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 			return this;
 		}
 
+		/**
+		 * Enable or disable debug mode.
+		 *
+		 * @param debug {@code true} to turn on debugging. By default, this is {@code false}.
+		 * @return this
+		 */
+		public Builder debugMode(final boolean debug) {
+			this.debug = debug;
+			return this;
+		}
+
+
+		/**
+		 * Defines timeout value in milliseconds for all mail-related operations.
+		 *
+		 * @param timeout timeout value in milliseconds.
+		 * @return this
+		 */
+		public Builder timeout(final int timeout) {
+			this.timeout = timeout;
+			return this;
+		}
+
+		/**
+		 * Disables the strict address.
+		 *
+		 * @param strictAddress {@code true} if strict address checking should be be turned on. By default, this is {@code true}.
+		 * @return this
+		 */
+		public Builder strictAddress(final boolean strictAddress) {
+			this.strictAddress = strictAddress;
+			return this;
+		}
+
+		public Builder property(final String name, final String value) {
+			this.customProperties.put(name, value);
+			return this;
+		}
+
 		// ---------------------------------------------------------------- build
 
 		/**
@@ -217,9 +294,9 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 		 */
 		public ImapServer buildImapMailServer() {
 			if (ssl) {
-				return new ImapSslServer(host, port, authenticator);
+				return new ImapSslServer(this);
 			}
-			return new ImapServer(host, port, authenticator);
+			return new ImapServer(this);
 		}
 
 		/**
@@ -230,9 +307,9 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 		 */
 		public Pop3Server buildPop3MailServer() {
 			if (ssl) {
-				return new Pop3SslServer(host, port, authenticator);
+				return new Pop3SslServer(this);
 			}
-			return new Pop3Server(host, port, authenticator);
+			return new Pop3Server(this);
 		}
 
 		/**
@@ -243,9 +320,9 @@ public abstract class MailServer<MailSessionImpl extends MailSession> {
 		 */
 		public SmtpServer buildSmtpMailServer() {
 			if (ssl) {
-				return new SmtpSslServer(host, port, authenticator);
+				return new SmtpSslServer(this);
 			}
-			return new SmtpServer(host, port, authenticator);
+			return new SmtpServer(this);
 		}
 	}
 }

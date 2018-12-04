@@ -25,6 +25,7 @@
 
 package jodd.typeconverter;
 
+import jodd.cache.TypeCache;
 import jodd.io.upload.FileUpload;
 import jodd.mutable.MutableByte;
 import jodd.mutable.MutableDouble;
@@ -54,7 +55,9 @@ import jodd.typeconverter.impl.FloatArrayConverter;
 import jodd.typeconverter.impl.FloatConverter;
 import jodd.typeconverter.impl.IntegerArrayConverter;
 import jodd.typeconverter.impl.IntegerConverter;
+import jodd.typeconverter.impl.LocalDateConverter;
 import jodd.typeconverter.impl.LocalDateTimeConverter;
+import jodd.typeconverter.impl.LocalTimeConverter;
 import jodd.typeconverter.impl.LocaleConverter;
 import jodd.typeconverter.impl.LongArrayConverter;
 import jodd.typeconverter.impl.LongConverter;
@@ -84,11 +87,11 @@ import java.net.URI;
 import java.net.URL;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -99,13 +102,20 @@ import java.util.UUID;
  */
 public class TypeConverterManager {
 
-	private final HashMap<Class, TypeConverter> converters = new HashMap<>();
-	private final Converter converter;
+	private static final TypeConverterManager TYPE_CONVERTER_MANAGER = new TypeConverterManager();
+
+	/**
+	 * Returns default implementation.
+	 */
+	public static TypeConverterManager get() {
+		return TYPE_CONVERTER_MANAGER;
+	}
+
+	private final TypeCache<TypeConverter> converters = TypeCache.createDefault();
 
 	// ---------------------------------------------------------------- methods
 
-	public TypeConverterManager(final Converter converter) {
-		this.converter = converter;
+	public TypeConverterManager() {
 		registerDefaults();
 	}
 
@@ -230,8 +240,10 @@ public class TypeConverterManager {
 		register(Time.class, new SqlTimeConverter());
 		register(Timestamp.class, new SqlTimestampConverter());
 		register(Calendar.class, new CalendarConverter());
-		register(GregorianCalendar.class, new CalendarConverter());
+//		register(GregorianCalendar.class, new CalendarConverter());
 		register(LocalDateTime.class, new LocalDateTimeConverter());
+		register(LocalDate.class, new LocalDateConverter());
+		register(LocalTime.class, new LocalTimeConverter());
 
 		register(File.class, new FileConverter());
 		register(FileUpload.class, new FileUploadConverter());
@@ -255,8 +267,7 @@ public class TypeConverterManager {
 	 * @param type		class that converter is for
 	 * @param typeConverter	converter for provided class
 	 */
-	public void register(final Class type, final TypeConverter typeConverter) {
-		converter.register(type, typeConverter);
+	public <T> void register(final Class<T> type, final TypeConverter<T> typeConverter) {
 		converters.put(type, typeConverter);
 	}
 
@@ -264,7 +275,6 @@ public class TypeConverterManager {
 	 * Un-registers converter for given type.
 	 */
 	public void unregister(final Class type) {
-		converter.register(type, null);
 		converters.remove(type);
 	}
 
@@ -276,7 +286,7 @@ public class TypeConverterManager {
 	 *
 	 * @return founded converter or <code>null</code>
 	 */
-	public TypeConverter lookup(final Class type) {
+	public <T> TypeConverter<T> lookup(final Class<T> type) {
 		return converters.get(type);
 	}
 
@@ -296,7 +306,8 @@ public class TypeConverterManager {
 			// no conversion :)
 			return (T) value;
 		}
-		TypeConverter converter = lookup(destinationType);
+
+		final TypeConverter converter = lookup(destinationType);
 
 		if (converter != null) {
 			return (T) converter.convert(value);
@@ -306,6 +317,11 @@ public class TypeConverterManager {
 
 		if (value == null) {
 			return null;
+		}
+
+		// check same instances
+		if (ClassUtil.isInstanceOf(value, destinationType)) {
+			return (T) value;
 		}
 
 		// handle destination arrays
@@ -324,11 +340,6 @@ public class TypeConverterManager {
 					return (T) e;
 				}
 			}
-		}
-
-		// check same instances
-		if (ClassUtil.isInstanceOf(value, destinationType)) {
-			return (T) value;
 		}
 
 		// collection

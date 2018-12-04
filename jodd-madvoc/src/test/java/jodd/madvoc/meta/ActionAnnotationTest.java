@@ -25,8 +25,11 @@
 
 package jodd.madvoc.meta;
 
+import jodd.util.annotation.AnnotationParser;
 import org.junit.jupiter.api.Test;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,55 +63,68 @@ class ActionAnnotationTest {
 
 	@Test
 	void testActionAnnotationOnly() throws NoSuchMethodException {
-		ActionAnnotation<Action> actionAnnotation = new ActionAnnotation<>(Action.class);
-		assertEquals(Action.class, actionAnnotation.getAnnotationClass());
-
 		Method method = this.getClass().getMethod("hello");
-		ActionAnnotationData<Action> annotationData = actionAnnotation.readAnnotatedElement(method);
 
-		assertNull(annotationData.alias);
-		assertNull(annotationData.value);
+		ActionAnnotationValues annotationValues = annValueOf(method);
+
+		assertNull(annotationValues.alias());
+		assertNull(annotationValues.value());
 
 		method = this.getClass().getMethod("hello2");
-		annotationData = actionAnnotation.readAnnotatedElement(method);
+		annotationValues = annValueOf(method);
 
-		assertEquals("alias", annotationData.alias);
-		assertEquals("value.ext", annotationData.value);
+		assertEquals("alias", annotationValues.alias);
+		assertEquals("value.ext", annotationValues.value);
 	}
 
 	@Test
 	void testCustomActionAnnotation() throws NoSuchMethodException {
-		ActionAnnotation<CustomAction> actionAnnotation = new ActionAnnotation<>(CustomAction.class);
-		assertEquals(CustomAction.class, actionAnnotation.getAnnotationClass());
+		final AnnotationParser annotationParser = parserFor(CustomAction.class);
 
 		Method method = this.getClass().getMethod("hello3");
-		ActionAnnotationData<CustomAction> annotationData = actionAnnotation.readAnnotatedElement(method);
+		ActionAnnotationValues annotationValues = ActionAnnotationValues.of(annotationParser, method);
 
-		assertEquals("ALIAS", annotationData.alias);
-		assertNull(annotationData.value);
+		assertEquals("ALIAS", annotationValues.alias());
+		assertNull(annotationValues.value());
 
 		method = this.getClass().getMethod("hello4");
-		annotationData = actionAnnotation.readAnnotatedElement(method);
+		annotationValues = ActionAnnotationValues.of(annotationParser, method);
 
-		assertEquals("ALIAS", annotationData.alias);
-		assertNull(annotationData.value);
+		assertEquals("ALIAS", annotationValues.alias());
+		assertNull(annotationValues.value());
 	}
 
 	@Test
 	void testMiscActionAnnotation() throws NoSuchMethodException {
-		ActionAnnotation<MiscAnnotation> actionAnnotation = new ActionAnnotation<>(MiscAnnotation.class);
-		assertEquals(MiscAnnotation.class, actionAnnotation.getAnnotationClass());
+		final AnnotationParser annotationParser = parserFor(MiscAnnotation.class);
 
 		Method method = this.getClass().getMethod("hello5");
-		ActionAnnotationData<MiscAnnotation> annotationData = actionAnnotation.readAnnotatedElement(method);
+		ActionAnnotationValues annotationValues = ActionAnnotationValues.of(annotationParser, method);
 
-		assertNull(annotationData.alias);
-		assertEquals("VAL", annotationData.value);
+		assertNull(annotationValues.alias());
+		assertEquals("VAL", annotationValues.value());
 
 		method = this.getClass().getMethod("hello6");
-		annotationData = actionAnnotation.readAnnotatedElement(method);
+		annotationValues = ActionAnnotationValues.of(annotationParser, method);
 
-		assertNull(annotationData.alias);
-		assertEquals("VAL", annotationData.value);
+		assertNull(annotationValues.alias());
+		assertEquals("VAL", annotationValues.value());
 	}
+
+
+	/**
+	 * Shortcut methods for given annotation class.
+	 */
+	public static AnnotationParser parserFor(final Class<? extends Annotation> annotationClass) {
+		return new AnnotationParser(annotationClass, Action.class);
+	}
+
+	/**
+	 * Shortcut method assuming default annotation.
+	 */
+	public static ActionAnnotationValues annValueOf(final AnnotatedElement annotatedElement) {
+		return ActionAnnotationValues.of(new AnnotationParser(Action.class), annotatedElement);
+	}
+
+
 }

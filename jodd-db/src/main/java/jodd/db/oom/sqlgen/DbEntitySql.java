@@ -26,8 +26,10 @@
 package jodd.db.oom.sqlgen;
 
 import jodd.bean.BeanUtil;
-import jodd.db.JoddDb;
+import jodd.db.DbOom;
 import jodd.db.oom.DbEntityDescriptor;
+import jodd.db.oom.DbEntityManager;
+import jodd.db.oom.DbOomConfig;
 import jodd.util.StringPool;
 
 import static jodd.db.oom.sqlgen.DbSqlBuilder.sql;
@@ -49,12 +51,24 @@ public class DbEntitySql {
 	private static final String SET = " set ";
 	private static final String SELECT_COUNT_1_FROM = "select count(*) from ";
 
+	private final DbEntityManager entityManager;
+	private final DbOomConfig dbOomConfig;
+
+	public DbEntitySql(final DbOom dbOom) {
+		this.entityManager = dbOom.entityManager();
+		this.dbOomConfig = dbOom.config();
+	}
+
+	public DbEntitySql() {
+		this(DbOom.get());
+	}
+
 	// ---------------------------------------------------------------- insert
 
 	/**
 	 * Creates INSERT query for the entity.
 	 */
-	public static DbSqlBuilder insert(final Object entity) {
+	public DbSqlBuilder insert(final Object entity) {
 		return sql().insert(entity);
 	}
 
@@ -63,7 +77,7 @@ public class DbEntitySql {
 	/**
 	 * Creates DELETE query that truncates all table data.
 	 */
-	public static DbSqlBuilder truncate(final Object entity) {
+	public DbSqlBuilder truncate(final Object entity) {
 		return sql().$(DELETE_FROM).table(entity, null);
 	}
 
@@ -72,10 +86,10 @@ public class DbEntitySql {
 	/**
 	 * Creates UPDATE query that updates all non-null values of an entity that is matched by id.
 	 */
-	public static DbSqlBuilder update(final Object entity) {
+	public DbSqlBuilder update(final Object entity) {
 		String tableRef = createTableRefName(entity);
 
-		if (!JoddDb.defaults().getSqlGenConfig().isUpdateAcceptsTableAlias()) {
+		if (!dbOomConfig.isUpdateAcceptsTableAlias()) {
 			tableRef = null;
 		}
 
@@ -85,10 +99,10 @@ public class DbEntitySql {
 	/**
 	 * Creates UPDATE query that updates all values of an entity that is matched by id.
 	 */
-	public static DbSqlBuilder updateAll(final Object entity) {
+	public DbSqlBuilder updateAll(final Object entity) {
 		String tableRef = createTableRefName(entity);
 
-		if (!JoddDb.defaults().getSqlGenConfig().isUpdateAcceptsTableAlias()) {
+		if (!dbOomConfig.isUpdateAcceptsTableAlias()) {
 			tableRef = null;
 		}
 
@@ -98,10 +112,10 @@ public class DbEntitySql {
 	/**
 	 * Creates UPDATE query for single column of an entity that is matched by id.
 	 */
-	public static DbSqlBuilder updateColumn(final Object entity, final String columnRef, final Object value) {
+	public DbSqlBuilder updateColumn(final Object entity, final String columnRef, final Object value) {
 		String tableRef = createTableRefName(entity);
 
-		if (!JoddDb.defaults().getSqlGenConfig().isUpdateAcceptsTableAlias()) {
+		if (!dbOomConfig.isUpdateAcceptsTableAlias()) {
 			tableRef = null;
 		}
 
@@ -111,8 +125,8 @@ public class DbEntitySql {
 	/**
 	 * Reads property value and updates the DB.
 	 */
-	public static DbSqlBuilder updateColumn(final Object entity, final String columnRef) {
-		Object value = BeanUtil.pojo.getProperty(entity, columnRef);
+	public DbSqlBuilder updateColumn(final Object entity, final String columnRef) {
+		final Object value = BeanUtil.pojo.getProperty(entity, columnRef);
 		return updateColumn(entity, columnRef, value);
 	}
 
@@ -121,16 +135,16 @@ public class DbEntitySql {
 	/**
 	 * Creates DELETE query that deletes entity matched by non-null values.
 	 */
-	public static DbSqlBuilder delete(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder delete(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(DELETE_FROM).table(entity, null, tableRef).$(WHERE).match(tableRef, entity);
 	}
 
 	/**
 	 * Creates DELETE query that deletes entity matched by all values.
 	 */
-	public static DbSqlBuilder deleteByAll(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder deleteByAll(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(DELETE_FROM).table(entity, null, tableRef).$(WHERE).matchAll(tableRef, entity);
 	}
 
@@ -139,16 +153,16 @@ public class DbEntitySql {
 	/**
 	 * Creates DELETE query that deletes entity by ID.
 	 */
-	public static DbSqlBuilder deleteById(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder deleteById(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(DELETE_FROM).table(entity, null, tableRef).$(WHERE).matchIds(tableRef, entity);
 	}
 
 	/**
 	 * Creates DELETE query that deletes entity by ID.
 	 */
-	public static DbSqlBuilder deleteById(final Object entityType, final long id) {
-		String tableRef = createTableRefName(entityType);
+	public DbSqlBuilder deleteById(final Object entityType, final long id) {
+		final String tableRef = createTableRefName(entityType);
 		return sql().
 			$(DELETE_FROM).table(entityType, null, tableRef).
 			$(WHERE).refId(tableRef).$(EQUALS).columnValue(Long.valueOf(id));
@@ -160,19 +174,19 @@ public class DbEntitySql {
 	 * Creates 'SELECT all FROM entity' part of the SQL query that can be easily extended.
 	 * Entity is referred with its simple class name.
 	 */
-	public static DbSqlBuilder from(final Object entity) {
+	public DbSqlBuilder from(final Object entity) {
 		return from(entity, createTableRefName(entity));
 	}
 
-	public static DbSqlBuilder from(final Object entity, final String tableRef) {
+	public DbSqlBuilder from(final Object entity, final String tableRef) {
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(SPACE);
 	}
 
-	public static DbSqlBuilder from(final Class entityType) {
+	public DbSqlBuilder from(final Class entityType) {
 		return from(entityType, createTableRefName(entityType));
 	}
 
-	public static DbSqlBuilder from(final Class entityType, final String tableRef) {
+	public DbSqlBuilder from(final Class entityType, final String tableRef) {
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entityType, tableRef).$(SPACE);
 	}
 
@@ -181,32 +195,32 @@ public class DbEntitySql {
 	/**
 	 * Creates SELECT criteria for the entity matched by non-null values.
 	 */
-	public static DbSqlBuilder find(final Class target, final Object matchEntity) {
-		String tableRef = createTableRefName(target);
+	public DbSqlBuilder find(final Class target, final Object matchEntity) {
+		final String tableRef = createTableRefName(target);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(target, tableRef).$(WHERE).match(tableRef, matchEntity);
 	}
 
 	/**
 	 * Creates SELECT criteria for the entity matched by non-null values.
 	 */
-	public static DbSqlBuilder find(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder find(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(WHERE).match(tableRef, entity);
 	}
 
 	/**
 	 * Creates SELECT criteria for the entity matched by all values.
 	 */
-	public static DbSqlBuilder findByAll(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder findByAll(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(WHERE).matchAll(tableRef, entity);
 	}
 
 	/**
 	 * Creates SELECT criteria for the entity matched by column name
 	 */
-	public static DbSqlBuilder findByColumn(final Class entity, final String column, final Object value) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder findByColumn(final Class entity, final String column, final Object value) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(WHERE).ref(tableRef, column).$(EQUALS).columnValue(value);
 	}
 
@@ -214,34 +228,45 @@ public class DbEntitySql {
 	 * Creates SELECT criteria for the entity matched by foreign key.
 	 * Foreign key is created by concatenating foreign table name and column name.
 	 */
-	public static DbSqlBuilder findForeign(final Class entity, final Object value) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder findForeign(final Class entity, final Object value) {
+		final String tableRef = createTableRefName(entity);
 
-		DbEntityDescriptor dedFk = JoddDb.defaults().getDbEntityManager().lookupType(value.getClass());
+		final DbEntityDescriptor dedFk = entityManager.lookupType(value.getClass());
 
-		String tableName = JoddDb.defaults().getDbOomConfig().getTableNames().convertTableNameToEntityName(dedFk.getTableName());
-		String columnName = JoddDb.defaults().getDbOomConfig().getColumnNames().convertColumnNameToPropertyName(dedFk.getIdColumnName());
+		final String tableName = dbOomConfig.getTableNames().convertTableNameToEntityName(dedFk.getTableName());
+		final String columnName = dbOomConfig.getColumnNames().convertColumnNameToPropertyName(dedFk.getIdColumnName());
 
-		String fkColumn = uncapitalize(tableName) + capitalize(columnName);
-		Object idValue = BeanUtil.pojo.getProperty(value, dedFk.getIdPropertyName());
+		final String fkColumn = uncapitalize(tableName) + capitalize(columnName);
+		final Object idValue = BeanUtil.pojo.getProperty(value, dedFk.getIdPropertyName());
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(WHERE).ref(tableRef, fkColumn).$(EQUALS).columnValue(idValue);
 	}
+
+	// ---------------------------------------------------------------- ALL
+
+	/**
+	 * Returns all records for given type.
+	 */
+	public DbSqlBuilder findAll(final Object entity) {
+		final String tableRef = createTableRefName(entity);
+		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef);
+	}
+
 
 	// ---------------------------------------------------------------- find by Id
 
 	/**
 	 * Creates SELECT criteria for the entity matched by id.
 	 */
-	public static DbSqlBuilder findById(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder findById(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entity, tableRef).$(WHERE).matchIds(tableRef, entity);
 	}
 
 	/**
 	 * Creates SELECT criteria for the entity matched by id.
 	 */
-	public static DbSqlBuilder findById(final Object entityType, final long id) {
-		String tableRef = createTableRefName(entityType);
+	public DbSqlBuilder findById(final Object entityType, final long id) {
+		final String tableRef = createTableRefName(entityType);
 		return sql().$(SELECT).column(tableRef).$(FROM).table(entityType, tableRef)
 				.$(WHERE).refId(tableRef).$(EQUALS).columnValue(Long.valueOf(id));
 	}
@@ -251,16 +276,16 @@ public class DbEntitySql {
 	/**
 	 * Creates SELECT COUNT criteria for the entity matched by non-null values.
 	 */
-	public static DbSqlBuilder count(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder count(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT_COUNT_1_FROM).table(entity, tableRef).$(WHERE).match(tableRef, entity);
 	}
 
 	/**
 	 * Creates SELECT COUNT all query.
 	 */
-	public static DbSqlBuilder count(final Class entityType) {
-		String tableRef = createTableRefName(entityType);
+	public DbSqlBuilder count(final Class entityType) {
+		final String tableRef = createTableRefName(entityType);
 		return sql().$(SELECT_COUNT_1_FROM).table(entityType, tableRef);
 	}
 
@@ -268,8 +293,8 @@ public class DbEntitySql {
 	/**
 	 * Creates SELECT COUNT criteria for the entity matched by all values.
 	 */
-	public static DbSqlBuilder countAll(final Object entity) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder countAll(final Object entity) {
+		final String tableRef = createTableRefName(entity);
 		return sql().$(SELECT_COUNT_1_FROM).table(entity, tableRef).$(WHERE).matchAll(tableRef, entity);
 	}
 
@@ -278,8 +303,8 @@ public class DbEntitySql {
 	/**
 	 * Creates UPDATE that increases/decreases column by some delta value.
 	 */
-	public static DbSqlBuilder increaseColumn(final Class entity, final long id, final String columnRef, final Number delta, final boolean increase) {
-		String tableRef = createTableRefName(entity);
+	public DbSqlBuilder increaseColumn(final Class entity, final long id, final String columnRef, final Number delta, final boolean increase) {
+		final String tableRef = createTableRefName(entity);
 
 		return sql().$(UPDATE).table(entity, null, tableRef).$(SET)
 				.ref(null, columnRef).$(EQUALS).ref(null, columnRef)

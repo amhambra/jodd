@@ -25,11 +25,11 @@
 
 package jodd.util;
 
-import jodd.core.JoddCore;
 import jodd.io.FileUtil;
 import jodd.io.findfile.ClassScanner;
 import jodd.mutable.Value;
 import jodd.test.DisabledOnJava;
+import jodd.util.cl.ClassLoaderStrategy;
 import jodd.util.cl.DefaultClassLoaderStrategy;
 import jodd.util.cl.ExtendedURLClassLoader;
 import org.junit.jupiter.api.Test;
@@ -129,7 +129,7 @@ class ClassLoaderUtilTest {
 
 		// special case
 
-		DefaultClassLoaderStrategy defaultClassLoaderStrategy = (DefaultClassLoaderStrategy) JoddCore.defaults().getClassLoaderStrategy();
+		DefaultClassLoaderStrategy defaultClassLoaderStrategy = (DefaultClassLoaderStrategy) ClassLoaderStrategy.get();
 
 		defaultClassLoaderStrategy.setLoadArrayClassByComponentTypes(true);
 
@@ -163,7 +163,7 @@ class ClassLoaderUtilTest {
 
 		ClassScanner classScanner = new ClassScanner() {
 			@Override
-			protected void onEntry(EntryData entryData) {
+			protected void onEntry(ClassPathEntry entryData) {
 				if (entryData.name().endsWith("jquery.js")) {
 					jqueryName.set(entryData.name());
 				}
@@ -176,6 +176,6 @@ class ClassLoaderUtilTest {
 
 		assertNotNull(url);
 
-		assertEquals("/META-INF/resources/webjars/jquery/2.1.1/jquery.js", jqueryName.get());
+		assertEquals("/META-INF/resources/webjars/jquery/2.2.4/jquery.js", jqueryName.get());
 	}
 }

@@ -25,15 +25,14 @@
 
 package jodd.madvoc.path;
 
-import jodd.madvoc.MadvocConfig;
-import jodd.madvoc.ScopeType;
+import jodd.madvoc.component.ActionsManager;
 import jodd.madvoc.config.ActionDefinition;
 import jodd.madvoc.config.ActionNames;
 import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
+import jodd.madvoc.meta.scope.MadvocContext;
 import jodd.util.CharUtil;
 import jodd.util.StringPool;
-import jodd.util.net.HttpMethod;
+import jodd.net.HttpMethod;
 
 import java.lang.reflect.Method;
 
@@ -42,15 +41,18 @@ import java.lang.reflect.Method;
  */
 public class RestActionNamingStrategy extends BaseNamingStrategy {
 
-	@In @Scope(ScopeType.CONTEXT)
-	protected MadvocConfig madvocConfig;
+	@In @MadvocContext
+	protected ActionsManager actionsManager;
+
+	protected boolean includeMethodActionPath = true;
 
 	@Override
 	public ActionDefinition buildActionDef(final Class actionClass, final Method actionMethod, final ActionNames actionNames) {
 
 		final String packageActionPath = actionNames.packageActionPath();
 		final String classActionPath = actionNames.classActionPath();
-		String methodActionPath = actionNames.methodActionPath();
+
+		String methodActionPath = includeMethodActionPath ? actionNames.methodActionPath() : null;
 		String httpMethod = actionNames.httpMethod();
 
 		if (httpMethod == null) {
@@ -65,7 +67,7 @@ public class RestActionNamingStrategy extends BaseNamingStrategy {
 		}
 
 		if (methodActionPath != null) {
-			if (httpMethod == null && methodActionPath.startsWith(madvocConfig.getPathMacroSeparators()[0])) {
+			if (httpMethod == null && methodActionPath.startsWith(actionsManager.getPathMacroSeparators()[0])) {
 				methodActionPath = actionMethod.getName() + StringPool.SLASH + methodActionPath;
 			}
 
@@ -113,9 +115,9 @@ public class RestActionNamingStrategy extends BaseNamingStrategy {
 			i++;
 		}
 
-		String name = methodName.substring(0, i).toUpperCase();
+		final String name = methodName.substring(0, i).toUpperCase();
 
-		for (HttpMethod httpMethod : HttpMethod.values()) {
+		for (final HttpMethod httpMethod : HttpMethod.values()) {
 			if (httpMethod.equalsName(name)) {
 				return httpMethod.name();
 			}

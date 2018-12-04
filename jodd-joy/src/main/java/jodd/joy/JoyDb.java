@@ -25,58 +25,88 @@
 
 package jodd.joy;
 
-import jodd.db.DbDetector;
+import jodd.chalk.Chalk256;
+import jodd.db.DbOom;
 import jodd.db.DbSessionProvider;
-import jodd.db.JoddDb;
 import jodd.db.connection.ConnectionProvider;
 import jodd.db.jtx.DbJtxSessionProvider;
 import jodd.db.jtx.DbJtxTransactionManager;
 import jodd.db.oom.AutomagicDbOomConfigurator;
+import jodd.db.oom.DbEntityDescriptor;
 import jodd.db.oom.DbEntityManager;
 import jodd.db.pool.CoreConnectionPool;
-import jodd.jtx.JoddJtx;
+import jodd.db.querymap.DbPropsQueryMap;
+import jodd.db.querymap.QueryMap;
 import jodd.jtx.JtxTransactionManager;
+import jodd.jtx.proxy.AnnotationTxAdvice;
 import jodd.jtx.proxy.AnnotationTxAdviceManager;
 import jodd.jtx.proxy.AnnotationTxAdviceSupport;
+import jodd.jtx.worker.LeanJtxWorker;
 import jodd.petite.PetiteContainer;
-import jodd.util.Consumers;
+import jodd.proxetta.MethodInfo;
+import jodd.proxetta.ProxyAspect;
+import jodd.proxetta.ProxyPointcut;
+import jodd.proxetta.pointcuts.MethodWithAnnotationPointcut;
+import jodd.util.ClassUtil;
+import jodd.util.function.Consumers;
 
+import java.lang.annotation.Annotation;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import static jodd.joy.JoddJoy.PETITE_DB;
-import static jodd.joy.JoddJoy.PETITE_DBPOOL;
+/**
+ * Tiny JoyDb kickstarter.
+ */
+public class JoyDb extends JoyBase implements JoyDbConfig {
 
-public class JoyDb extends JoyBase {
-
+	protected final Supplier<String> appNameSupplier;
 	protected final Supplier<JoyScanner> joyScannerSupplier;
-	protected final Supplier<PetiteContainer> petiteContainerSupplier;
+	protected final Supplier<JoyProxetta> joyProxettaSupplier;
+	protected final Supplier<JoyPetite> joyPetiteSupplier;
 
+	protected DbOom dbOom;
 	protected ConnectionProvider connectionProvider;
 	protected JtxTransactionManager jtxManager;
 	protected String jtxScopePattern;
 
-	public JoyDb(final Supplier<PetiteContainer> petiteContainerSupplier, final Supplier<JoyScanner> joyScannerSupplier) {
+	public JoyDb(
+			final Supplier<String> appNameSupplier,
+			final Supplier<JoyPetite> joyPetiteSupplier,
+			final Supplier<JoyProxetta> joyProxettaSupplier,
+			final Supplier<JoyScanner> joyScannerSupplier) {
+		this.appNameSupplier = appNameSupplier;
+		this.joyPetiteSupplier = joyPetiteSupplier;
 		this.joyScannerSupplier = joyScannerSupplier;
-		this.petiteContainerSupplier = petiteContainerSupplier;
+		this.joyProxettaSupplier = joyProxettaSupplier;
 	}
 
-	// ---------------------------------------------------------------- getters
+	// ---------------------------------------------------------------- runtime
+
 	/**
 	 * Returns connection provider once when component is started.
 	 */
 	public ConnectionProvider getConnectionProvider() {
-		return connectionProvider;
+		return requireStarted(connectionProvider);
 	}
 
 	/**
-	 * Returns JTX transaction manager.
+	 * Returns JTX transaction manager once when component is started.
 	 */
 	public JtxTransactionManager getJtxManager() {
-		return jtxManager;
+		return requireStarted(jtxManager);
+	}
+
+	/**
+	 * Returns {@code true} if database usage is enabled.
+	 */
+	public boolean isDatabaseEnabled() {
+		return databaseEnabled;
 	}
 
 	// ---------------------------------------------------------------- config
@@ -86,31 +116,32 @@ public class JoyDb extends JoyBase {
 	private Supplier<ConnectionProvider> connectionProviderSupplier;
 	private Consumers<DbEntityManager> dbEntityManagerConsumers = Consumers.empty();
 
+	@Override
 	public JoyDb disableDatabase() {
+		requireNotStarted(connectionProvider);
 		databaseEnabled = false;
 		return this;
 	}
 
+	@Override
 	public JoyDb disableAutoConfiguration() {
+		requireNotStarted(connectionProvider);
 		autoConfiguration = false;
 		return this;
 	}
 
+	@Override
 	public JoyDb withEntityManager(final Consumer<DbEntityManager> dbEntityManagerConsumer) {
+		requireNotStarted(connectionProvider);
 		dbEntityManagerConsumers.add(dbEntityManagerConsumer);
 		return this;
 	}
 
+	@Override
 	public JoyDb withConnectionProvider(final Supplier<ConnectionProvider> connectionProviderSupplier) {
+		requireNotStarted(connectionProvider);
 		this.connectionProviderSupplier = connectionProviderSupplier;
 		return this;
-	}
-
-	/**
-	 * Returns {@code true} if database usage is enabled.
-	 */
-	public boolean isDatabaseEnabled() {
-		return databaseEnabled;
 	}
 
 	// ---------------------------------------------------------------- lifecycle
@@ -123,7 +154,7 @@ public class JoyDb extends JoyBase {
 	 */
 	@Override
 	@SuppressWarnings("unchecked")
-	void start() {
+	public void start() {
 		initLogger();
 
 		if (!databaseEnabled) {
@@ -133,60 +164,72 @@ public class JoyDb extends JoyBase {
 
 		log.info("DB start ----------");
 
+		final PetiteContainer petiteContainer = joyPetiteSupplier.get().getPetiteContainer();
+
 		// connection pool
 		connectionProvider = createConnectionProviderIfNotSupplied();
-		petiteContainerSupplier.get().addBean(PETITE_DBPOOL, connectionProvider);
+
+		petiteContainer.addBean(beanNamePrefix() + "pool", connectionProvider);
+
 		if (connectionProvider instanceof CoreConnectionPool) {
 			final CoreConnectionPool pool = (CoreConnectionPool) connectionProvider;
 			if (pool.getDriver() == null) {
 				databaseEnabled = false;
-				log.warn("DB configuration not set. DB will be disabled.");
+				log.warn("DB configuration not set (" + beanNamePrefix() + "pool.*). DB will be disabled.");
 				return;
 			}
 		}
 		connectionProvider.init();
 
 		checkConnectionProvider();
-		DbDetector.detectDatabaseAndConfigureDbOom(connectionProvider);
 
 		// transactions manager
 		jtxManager = createJtxTransactionManager(connectionProvider);
 		jtxManager.setValidateExistingTransaction(true);
 
-		AnnotationTxAdviceManager annTxAdviceManager = new AnnotationTxAdviceManager(jtxManager, jtxScopePattern);
-		annTxAdviceManager.registerAnnotations(JoddJtx.defaults().getTxAnnotations());
+		final AnnotationTxAdviceManager annTxAdviceManager = new AnnotationTxAdviceManager(new LeanJtxWorker(jtxManager), jtxScopePattern);
 		AnnotationTxAdviceSupport.manager = annTxAdviceManager;
 
-		DbSessionProvider sessionProvider = new DbJtxSessionProvider(jtxManager);
+		// create proxy
+		joyProxettaSupplier.get().getProxetta().withAspect(createTxProxyAspects(annTxAdviceManager.getAnnotations()));
 
-		// global settings
-		JoddDb.defaults().setConnectionProvider(connectionProvider);
-		JoddDb.defaults().setSessionProvider(sessionProvider);
-		petiteContainerSupplier.get().addBean(PETITE_DB, JoddDb.defaults());           // todo -> this is for the configuration!, make this for each bean
+		final DbSessionProvider sessionProvider = new DbJtxSessionProvider(jtxManager);
 
-		final DbEntityManager dbEntityManager = JoddDb.defaults().getDbEntityManager();
+		// querymap
+		final long startTime = System.currentTimeMillis();
+
+		final QueryMap queryMap = new DbPropsQueryMap();
+
+		log.debug("Queries loaded in " + (System.currentTimeMillis() - startTime) + "ms.");
+		log.debug("Total queries: " + queryMap.size());
+
+		// dboom
+		dbOom = DbOom.create()
+			.withConnectionProvider(connectionProvider)
+			.withSessionProvider(sessionProvider)
+			.withQueryMap(queryMap)
+			.get();
+
+		dbOom.connect();
+
+		final DbEntityManager dbEntityManager = dbOom.entityManager();
 		dbEntityManager.reset();
+
+		petiteContainer.addBean(beanNamePrefix() + "query", dbOom.queryConfig());
+		petiteContainer.addBean(beanNamePrefix() + "oom", dbOom.config());
 
 		// automatic configuration
 		if (autoConfiguration) {
-			registerDbEntities(dbEntityManager);
+			final AutomagicDbOomConfigurator automagicDbOomConfigurator =
+				new AutomagicDbOomConfigurator(dbEntityManager, true);
+
+			automagicDbOomConfigurator.registerAsConsumer(
+				joyScannerSupplier.get().getClassScanner());
 		}
 
 		dbEntityManagerConsumers.accept(dbEntityManager);
-	}
 
-	/**
-	 * Registers DbOom entities. By default, scans the
-	 * class path and register entities automagically.
-	 */
-	protected void registerDbEntities(final DbEntityManager dbEntityManager) {
-		AutomagicDbOomConfigurator dbcfg = new AutomagicDbOomConfigurator();
-
-		dbcfg.withScanner(classScanner -> joyScannerSupplier.get().accept(classScanner));
-
-		log.info("*DB Automagic scanning");
-
-		dbcfg.configure(dbEntityManager);
+		log.info("DB OK!");
 	}
 
 	/**
@@ -213,7 +256,7 @@ public class JoyDb extends JoyBase {
 	protected void checkConnectionProvider() {
 		final Connection connection = connectionProvider.getConnection();
 		try {
-			DatabaseMetaData databaseMetaData = connection.getMetaData();
+			final DatabaseMetaData databaseMetaData = connection.getMetaData();
 			String name = databaseMetaData.getDatabaseProductName();
 			String version = databaseMetaData.getDatabaseProductVersion();
 
@@ -227,8 +270,17 @@ public class JoyDb extends JoyBase {
 		}
 	}
 
+	protected ProxyAspect createTxProxyAspects(final Class<? extends Annotation>[] annotations) {
+		return new ProxyAspect(
+			AnnotationTxAdvice.class,
+			((ProxyPointcut) MethodInfo::isPublicMethod)
+				.and(MethodWithAnnotationPointcut.of(annotations))
+		);
+	}
+
+
 	@Override
-	void stop() {
+	public void stop() {
 		if (!databaseEnabled) {
 			return;
 		}
@@ -240,9 +292,48 @@ public class JoyDb extends JoyBase {
 		if (jtxManager != null) {
 			jtxManager.close();
 		}
+		jtxManager = null;
 
 		if (connectionProvider != null) {
 			connectionProvider.close();
 		}
+		connectionProvider = null;
+
+		if (dbOom != null) {
+			dbOom.shutdown();
+		}
+		dbOom = null;
+	}
+
+	protected String beanNamePrefix() {
+		final String appName = appNameSupplier.get();
+		return appName + ".db.";
+	}
+
+	// ---------------------------------------------------------------- print
+
+	public void printEntities(final int width) {
+		if (!databaseEnabled) {
+			return;
+		}
+
+		final List<DbEntityDescriptor> list = new ArrayList<>();
+		dbOom.entityManager().forEachEntity(list::add);
+
+		if (list.isEmpty()) {
+			return;
+		}
+
+		final Print print = new Print();
+		print.line("Entities", width);
+
+		list.stream()
+			.sorted(Comparator.comparing(DbEntityDescriptor::getEntityName))
+			.forEach(ded -> print.outLeftRightNewLine(
+				Chalk256.chalk().yellow(), ded.getTableName(),
+				Chalk256.chalk().blue(),   ClassUtil.getShortClassName(ded.getType(), 2),
+				width));
+
+		print.line(width);
 	}
 }

@@ -25,72 +25,136 @@
 
 package jodd.cache;
 
-import java.util.Collection;
+import java.util.AbstractMap;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
- * Type cache.
+ * Types cache. Provides several implementations depending on what you need to be addressed.
+ * There are two things you should take care off:
+ * <ul>
+ *     <li>synchronization - especially on storing items. If not synchronized, one instance of an item may be put
+ *     more then once into the map. This is usually fine, as it happens only during the initialization and makes not
+ *     harm if something is created twice</li>
+ *     <li>weak - if your key classes are replaced during the runtime, you should use weak map, in order to automatically
+ *     remove obsolete keys.</li>
+ * </ul>
  */
 public class TypeCache<T> {
 
-	public static <A> TypeCache<A> create(final Implementation implementation) {
-		return new TypeCache<>(implementation);
+	public static class Defaults {
+		/**
+		 * Default {@link TypeCache} implementation.
+		 */
+		public static Supplier<TypeCache> implementation = () -> TypeCache.create().get();
 	}
 
-	public enum Implementation {
-		/**
-		 * Just a simple map.
-		 */
-		MAP(false, false),
-		/**
-		 * Synchronized map.
-		 */
-		SYNC_MAP(false, true),
-		/**
-		 * Weak map.
-		 */
-		WEAK(true, false),
-		/**
-		 * Synchronized and weak map.
-		 */
-		SYNC_WEAK(true, true);
+	// ---------------------------------------------------------------- builder
 
-		private final boolean sync;
-		private final boolean weak;
+	/**
+	 * Creates a type cache by using a builder.
+	 */
+	public static <A> Builder<A> create() {
+		return new Builder<>();
+	}
 
-		Implementation(final boolean weak, final boolean sync) {
-			this.weak = weak;
-			this.sync = sync;
+	/**
+	 * Creates default implementation of the type cache.
+	 */
+	@SuppressWarnings("unchecked")
+	public static <A> TypeCache<A> createDefault() {
+		return (TypeCache<A>)Defaults.implementation.get();
+	}
+
+	public static class Builder<A> {
+		private boolean threadsafe;
+		private boolean weak;
+		private boolean none;
+
+		/**
+		 * No cache will be used.
+		 * Setting other properties will not have any affect.
+		 */
+		public Builder<A> noCache() {
+			none = true;
+			return this;
 		}
 
 		/**
-		 * Creates a map based on type.
+		 * Cache keys will be weak.
 		 */
-		public <A> Map<Class<?>, A> createMap() {
-			if (weak) {
-				if (sync) {
-					return Collections.synchronizedMap(new WeakHashMap<>());
+		public Builder<A> weak(final boolean weak) {
+			this.weak = weak;
+			return this;
+		}
+		/**
+		 * Cache will be thread-safe.
+		 */
+		public Builder<A> threadsafe(final boolean threadsafe) {
+			this.threadsafe = threadsafe;
+			return this;
+		}
+
+		/**
+		 * Builds a type cache.
+		 */
+		public TypeCache<A> get() {
+			final Map<Class<?>, A> map;
+			if (none) {
+				map = new AbstractMap<Class<?>, A>() {
+					@Override
+					public A put(final Class<?> key, final A value) {
+						return null;
+					}
+
+					@Override
+					public A get(final Object key) {
+						return null;
+					}
+
+					@Override
+					public Set<Entry<Class<?>, A>> entrySet() {
+						return Collections.emptySet();
+					}
+				};
+			}
+			else if (weak) {
+				if (threadsafe) {
+					map = Collections.synchronizedMap(new WeakHashMap<>());
 				} else {
-					return new WeakHashMap<>();
+					map = new WeakHashMap<>();
 				}
 			} else {
-				if (sync) {
-					return new ConcurrentHashMap<>();
+				if (threadsafe) {
+					map = new ConcurrentHashMap<>();
 				} else {
-					return new HashMap<>();
+					map = new IdentityHashMap<>();
 				}
 			}
+
+			return new TypeCache<>(map);
 		}
 	}
+
+	// ---------------------------------------------------------------- map
 
 	private final Map<Class<?>, T> map;
 
-	public TypeCache(final Implementation typeCacheImplementation) {
-		this.map = typeCacheImplementation.createMap();
+	private TypeCache(final Map<Class<?>, T> backedMap) {
+		this.map = backedMap;
+	}
+
+	/**
+	 * Add values to the map.
+	 */
+	public T put(final Class<?> type, final T value) {
+		return map.put(type, value);
 	}
 
 	/**
@@ -101,21 +165,16 @@ public class TypeCache<T> {
 	}
 
 	/**
-	 * Returns existing value of default one if key is not registered.
+	 * Returns existing value or add default supplied one.
+	 * Use this method instead of {@code get-nullcheck-put} block when
+	 * thread-safety is of importance.
 	 */
-	public T getOrDefault(final Class<?> key, final T defaultValue) {
-		return map.getOrDefault(key, defaultValue);
+	public T get(final Class<?> key, final Supplier<T> valueSupplier) {
+		return map.computeIfAbsent(key, aClass -> valueSupplier.get());
 	}
 
 	/**
-	 * Cache some value for given class.
-	 */
-	public T put(final Class<?> key, final T value) {
-		return map.put(key, value);
-	}
-
-	/**
-	 * Removes element from type cache.
+	 * Removes element from the type cache.
 	 */
 	public T remove(final Class<?> type) {
 		return map.remove(type);
@@ -143,17 +202,10 @@ public class TypeCache<T> {
 	}
 
 	/**
-	 * Returns collection of map values.
+	 * Iterates all cached values.
 	 */
-	public Collection<T> values() {
-		return map.values();
-	}
-
-	/**
-	 * Returns {@code true} if the key is contained in the cache.
-	 */
-	public boolean containsKey(final Class type) {
-		return map.containsKey(type);
+	public void forEachValue(final Consumer<? super T> valueConsumer) {
+		map.values().forEach(valueConsumer);
 	}
 
 }

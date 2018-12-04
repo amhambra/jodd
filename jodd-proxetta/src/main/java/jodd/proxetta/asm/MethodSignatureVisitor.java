@@ -27,8 +27,9 @@ package jodd.proxetta.asm;
 
 import jodd.asm.AsmUtil;
 import jodd.asm.TraceSignatureVisitor;
-import jodd.asm6.Opcodes;
-import jodd.asm6.signature.SignatureVisitor;
+import jodd.asm7.Opcodes;
+import jodd.asm7.signature.SignatureVisitor;
+import jodd.buffer.FastIntBuffer;
 import jodd.proxetta.AnnotationInfo;
 import jodd.proxetta.ClassInfo;
 import jodd.proxetta.GenericsReader;
@@ -37,7 +38,6 @@ import jodd.proxetta.ProxettaException;
 import jodd.proxetta.TypeInfo;
 import jodd.util.StringPool;
 import jodd.util.StringUtil;
-import jodd.util.collection.IntArrayList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,8 +57,9 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 	protected final String methodName;
 	protected final String[] exceptionsArray;
 	protected final boolean isStatic;
+	protected final boolean isFinal;
 	protected final ClassInfo targetClassInfo;
-	protected final IntArrayList argumentsOffset;
+	protected final FastIntBuffer argumentsOffset;
 	protected final List<TypeInfoImpl> arguments;
 	protected final int access;
 	protected final String description;
@@ -70,15 +71,26 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 	protected String asmMethodSignature;
 	protected AnnotationInfo[] annotations;
 	protected String declaredClassName;
-	protected Map<String, String> generics;
+	protected final Map<String, String> generics;
+	protected final Map<String, String> declaredTypeGeneric;
 
 
 	// ---------------------------------------------------------------- ctors
 
-	public MethodSignatureVisitor(final String methodName, final int access, final String classname, final String description, final String[] exceptions, final String signature, final ClassInfo targetClassInfo) {
-		super(new StringBuilder());
-		this.isInterface = (access & Opcodes.ACC_INTERFACE) != 0;
+	public MethodSignatureVisitor(
+			final String methodName,
+			final int access,
+			final String classname,
+			final String description,
+			final String[] exceptions,
+			final String signature,
+			final Map<String, String> declaredTypeGenerics,
+			final ClassInfo targetClassInfo) {
+
+		super(new StringBuilder(), (access & Opcodes.ACC_INTERFACE) != 0);
+//		this.isInterface = (access & Opcodes.ACC_INTERFACE) != 0;
 		this.isStatic = (access & Opcodes.ACC_STATIC) != 0;
+		this.isFinal = (access & Opcodes.ACC_FINAL) != 0;
 		this.methodName = methodName;
 		this.access = access;
 		this.classname = classname;
@@ -87,12 +99,13 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 		this.asmMethodSignature = signature;
 		this.generics = new GenericsReader().parseSignatureForGenerics(signature, isInterface);
 		this.exceptionsArray = exceptions;
+		this.declaredTypeGeneric = declaredTypeGenerics;
 
 		this.arguments = new ArrayList<>();
 		this.arguments.add(new TypeInfoImpl('L', null, null, null));
 
-		this.argumentsOffset = new IntArrayList();
-		this.argumentsOffset.add(0);
+		this.argumentsOffset = new FastIntBuffer();
+		this.argumentsOffset.append(0);
 
 		this.annotations = NO_ANNOTATIONS;
 	}
@@ -109,7 +122,7 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 			String retType = decl.substring(ndx);
 
 			StringBuilder methodDeclaration = new StringBuilder(50);
-			methodDeclaration.append(retType).append(' ').append(methodName).append(decl.substring(0, ndx));
+			methodDeclaration.append(retType).append(' ').append(methodName).append(decl, 0, ndx);
 
 			String exceptionsAsString = getExceptionsAsString();
 			if (exceptionsAsString != null) {
@@ -329,7 +342,7 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 			arguments.add(typeInfo);
 
 			argumentsCount++;
-			argumentsOffset.add(argumentsWords + 1);
+			argumentsOffset.append(argumentsWords + 1);
 
 			if ((type == 'D') || (type == 'J')) {
 				argumentsWords += 2;
@@ -412,7 +425,7 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 			rawTypeName = generics.get(typeName);
 		}
 		else {
-			rawTypeName = targetClassInfo.getGenerics().getOrDefault(typeName, typeName);
+			rawTypeName = declaredTypeGeneric.getOrDefault(typeName, typeName);
 		}
 
 		if (isArray) {
@@ -426,7 +439,7 @@ public class MethodSignatureVisitor extends TraceSignatureVisitor implements Met
 		if (generics.containsKey(typeName)) {
 			return true;
 		}
-		return targetClassInfo.getGenerics().containsKey(typeName);
+		return declaredTypeGeneric.containsKey(typeName);
 	}
 
 	// ---------------------------------------------------------------- toString

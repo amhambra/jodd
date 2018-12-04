@@ -26,12 +26,9 @@
 package jodd.mail;
 
 import jodd.core.JoddCore;
-import jodd.io.FastByteArrayOutputStream;
-import jodd.io.StreamUtil;
 import jodd.util.CharUtil;
 import jodd.util.StringPool;
 
-import javax.activation.DataSource;
 import javax.mail.Authenticator;
 import javax.mail.MessagingException;
 import javax.mail.NoSuchProviderException;
@@ -41,10 +38,6 @@ import javax.mail.Store;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeUtility;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Properties;
 
 /**
@@ -112,17 +105,16 @@ public class EmailUtil {
 	 *
 	 * @param contentType     content type.
 	 * @param defaultEncoding Default encoding to be used if extract returns {@code null}.
-	 *                        If defaultEncoding is {@code null}, {@link JoddCore#getEncoding()} will be used.
+	 *                        If defaultEncoding is {@code null}, {@link JoddCore#encoding} will be used.
 	 * @return Encoding from the content type.
 	 * @see #extractEncoding(String)
-	 * @see JoddCore#getEncoding()
 	 */
 	public static String extractEncoding(final String contentType, String defaultEncoding) {
 		String encoding = extractEncoding(contentType);
 
 		if (encoding == null) {
 			if (defaultEncoding == null) {
-				defaultEncoding = JoddCore.defaults().getEncoding();
+				defaultEncoding = JoddCore.encoding;
 			}
 			encoding = defaultEncoding;
 		}
@@ -169,21 +161,12 @@ public class EmailUtil {
 	}
 
 	/**
-	 * Setups the system email properties.
-	 */
-	public static void setupSystemMailProperties() {
-		final JoddMail defaults = JoddMail.defaults();
-		System.setProperty("mail.mime.encodefilename", Boolean.valueOf(defaults.isMailMimeEncodefilename()).toString());
-		System.setProperty("mail.mime.decodefilename", Boolean.valueOf(defaults.isMailMimeDecodefilename()).toString());
-	}
-
-	/**
 	 * @param protocol          Protocol such as {@link ImapServer#PROTOCOL_IMAP} or {@link Pop3Server#PROTOCOL_POP3}.
 	 * @param sessionProperties Session properties to use.
 	 * @param authenticator     Authenticator which contains necessary authentication for server.
 	 * @return {@link ReceiveMailSession}.
 	 */
-	public static ReceiveMailSession createSession(final String protocol, final Properties sessionProperties, final Authenticator authenticator) {
+	public static ReceiveMailSession createSession(final String protocol, final Properties sessionProperties, final Authenticator authenticator, final File attachmentStorage) {
 		final Session session = Session.getInstance(sessionProperties, authenticator);
 		final Store store;
 		try {
@@ -192,60 +175,7 @@ public class EmailUtil {
 			final String errMsg = String.format("Failed to create %s session", protocol);
 			throw new MailException(errMsg, nspex);
 		}
-		return new ReceiveMailSession(session, store);
+		return new ReceiveMailSession(session, store, attachmentStorage);
 	}
 
-	/**
-	 * Copies data from {@link InputStream} to {@link OutputStream} out, closes the {@link InputStream} and returns output.
-	 *
-	 * @param input  {@link InputStream} to copy from.
-	 * @param output {@link OutputStream} to copy to.
-	 * @return {@link OutputStream} out with data.
-	 * @throws MailException in place of {@link IOException}.
-	 * @see StreamUtil#copy(InputStream, OutputStream)
-	 */
-	public static OutputStream copyStream(final InputStream input, final OutputStream output) throws MailException {
-		try {
-			StreamUtil.copy(input, output);
-		} catch (final IOException ioex) {
-			throw new MailException(ioex);
-		} finally {
-			StreamUtil.close(input);
-		}
-		return output;
-	}
-
-	/**
-	 * Copies data from {@link DataSource} to {@link OutputStream}, closes the {@link InputStream} and returns output.
-	 *
-	 * @param input  {@link DataSource} to copy from.
-	 * @param output {@link OutputStream} to copy to.
-	 * @return new {@link FastByteArrayOutputStream} with data from input.
-	 * @see #copyStream(InputStream, OutputStream)
-	 */
-	public static OutputStream copyStream(final DataSource input, final OutputStream output) throws MailException {
-		try {
-			copyStream(input.getInputStream(), output);
-			return output;
-		} catch (final IOException ioex) {
-			throw new MailException(ioex);
-		}
-	}
-
-	/**
-	 * Copies data from {@link DataSource} to {@link File}, closes the {@link DataSource} and returns output.
-	 *
-	 * @param input  {@link DataSource} to copy from.
-	 * @param output {@link OutputStream} to copy to.
-	 * @return new {@link FastByteArrayOutputStream} with data from input.
-	 * @see #copyStream(InputStream, OutputStream)
-	 */
-	public static File copyStream(final DataSource input, final File output) throws MailException {
-		try {
-			copyStream(input.getInputStream(), new FileOutputStream(output));
-			return output;
-		} catch (final IOException ioex) {
-			throw new MailException(ioex);
-		}
-	}
 }

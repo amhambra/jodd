@@ -34,15 +34,14 @@ import jodd.servlet.upload.MultipartRequestWrapper;
 import jodd.util.Base64;
 import jodd.util.StringPool;
 import jodd.util.StringUtil;
-import jodd.util.net.MimeTypes;
-import jodd.util.net.URLCoder;
+import jodd.net.MimeTypes;
+import jodd.net.URLCoder;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import javax.servlet.jsp.PageContext;
 import java.io.BufferedReader;
 import java.io.CharArrayWriter;
@@ -101,8 +100,11 @@ public class ServletUtil {
 		if (header == null) {
 			return null;
 		}
-		String encoded = header.substring(header.indexOf(' ') + 1);
-		String decoded = new String(Base64.decode(encoded));
+		if (!header.contains("Basic ")) {
+			return null;
+		}
+		final String encoded = header.substring(header.indexOf(' ') + 1);
+		final String decoded = new String(Base64.decode(encoded));
 		return decoded.substring(0, decoded.indexOf(':'));
 	}
 
@@ -115,9 +117,28 @@ public class ServletUtil {
 		if (header == null) {
 			return null;
 		}
-		String encoded = header.substring(header.indexOf(' ') + 1);
-		String decoded = new String(Base64.decode(encoded));
+		if (!header.contains("Basic ")) {
+			return null;
+		}
+		final String encoded = header.substring(header.indexOf(' ') + 1);
+		final String decoded = new String(Base64.decode(encoded));
 		return decoded.substring(decoded.indexOf(':') + 1);
+	}
+
+	/**
+	 * Returns Bearer token.
+	 */
+	public static String resolveAuthBearerToken(final HttpServletRequest request) {
+		String header = request.getHeader(HEADER_AUTHORIZATION);
+		if (header == null) {
+			return null;
+		}
+		int ndx = header.indexOf("Bearer ");
+		if (ndx == -1) {
+			return null;
+		}
+
+		return header.substring(ndx + 7).trim();
 	}
 
 	/**
@@ -221,7 +242,7 @@ public class ServletUtil {
 		if (list.isEmpty()) {
 			return null;
 		}
-		return list.toArray(new Cookie[list.size()]);
+		return list.toArray(new Cookie[0]);
 	}
 
 	// ---------------------------------------------------------------- request body
@@ -244,7 +265,7 @@ public class ServletUtil {
 	public static String readRequestBodyFromStream(final HttpServletRequest request) throws IOException {
 		String charEncoding = request.getCharacterEncoding();
 		if (charEncoding == null) {
-			charEncoding = JoddCore.defaults().getEncoding();
+			charEncoding = JoddCore.encoding;
 		}
 		CharArrayWriter charArrayWriter = new CharArrayWriter();
 		BufferedReader bufferedReader = null;
@@ -355,7 +376,7 @@ public class ServletUtil {
 		if (value != null) {
 			return value;
 		}
-		return request.getSession().getServletContext().getAttribute(name);
+		return request.getServletContext().getAttribute(name);
 	}
 
 	/**
@@ -416,7 +437,7 @@ public class ServletUtil {
 		if (value != null) {
 			return value;
 		}
-		return request.getSession().getServletContext().getAttribute(name);
+		return request.getServletContext().getAttribute(name);
 	}
 
 	// ---------------------------------------------------------------- scope attributes
@@ -437,7 +458,7 @@ public class ServletUtil {
 			request.getSession().setAttribute(name, value);
 		}
 		else if (scopeValue.equals(SCOPE_APPLICATION)) {
-            request.getSession().getServletContext().setAttribute(name, value);
+            request.getServletContext().setAttribute(name, value);
         }
 		else {
 			throw new IllegalArgumentException("Invalid scope: " + scope);
@@ -460,7 +481,7 @@ public class ServletUtil {
 			request.getSession().removeAttribute(name);
 		}
 		else if (scopeValue.equals(SCOPE_APPLICATION)) {
-            request.getSession().getServletContext().removeAttribute(name);
+            request.getServletContext().removeAttribute(name);
         }
 		else {
 			throw new IllegalArgumentException("Invalid scope: " + scope);
@@ -609,6 +630,19 @@ public class ServletUtil {
 		return paramValues;
 	}
 
+	// ---------------------------------------------------------------- types
+
+	/**
+	 * Returns {@code true} if request has JSON content type.
+	 */
+	public static boolean isJsonRequest(HttpServletRequest servletRequest) {
+		final String contentType = servletRequest.getContentType();
+		if (contentType == null) {
+			return false;
+		}
+
+		return contentType.equals(MimeTypes.MIME_APPLICATION_JSON);
+	}
 
 	// ---------------------------------------------------------------- copy
 
@@ -689,97 +723,6 @@ public class ServletUtil {
 		request.setAttribute(JAVAX_SERVLET_ERROR_EXCEPTION, throwable);
 	}
 
-
-	// ---------------------------------------------------------------- debug
-
-	/**
-	 * Returns a string with debug info from all servlet objects.
-	 * @see #debug(HttpServletRequest, PageContext)
-	 */
-	public static String debug(final HttpServletRequest request) {
-		return debug(request,  null);
-	}
-	/**
-	 * Returns a string with debug info from all servlet objects.
-	 * @see #debug(HttpServletRequest, PageContext)
-	 */
-	public static String debug(final PageContext pageContext) {
-		return debug((HttpServletRequest) pageContext.getRequest(),  pageContext);
-	}
-
-	/**
-	 * Returns a string with debug info from all servlet objects, including the page context.
-	 */
-	protected static String debug(final HttpServletRequest request, final PageContext pageContext) {
-		StringBuilder result = new StringBuilder();
-		result.append("\nPARAMETERS\n----------\n");
-		Enumeration enumeration = request.getParameterNames();
-		while (enumeration.hasMoreElements()) {
-			String name = (String) enumeration.nextElement();
-			Object[] value = request.getParameterValues(name);
-			result.append(name).append('=');
-			if (value == null) {
-				result.append("<null>");
-			} else if (value.length == 1) {
-				result.append(value[0]).append('\n');
-			} else {
-				result.append('[');
-				for (int i = 0, valueLength = value.length; i < valueLength; i++) {
-					if (i == 0) {
-						result.append(',');
-					}
-					result.append(value[i]);
-				}
-				result.append("]\n");
-			}
-		}
-
-		HttpSession session = request.getSession();
-		ServletContext context = session.getServletContext();
-
-		loop:
-		for (int i = 0; i < 4; i++) {
-			switch (i) {
-				case 0: result.append("\nREQUEST\n-------\n");
-						enumeration = request.getAttributeNames();
-						break;
-				case 1: result.append("\nSESSION\n-------\n");
-						enumeration = session.getAttributeNames();
-						break;
-				case 2: result.append("\nAPPLICATION\n-----------\n");
-						enumeration = context.getAttributeNames();
-						break;
-				case 3:	if (pageContext == null) {
-							break loop;
-						}
-						result.append("\nPAGE\n----\n");
-						enumeration = pageContext.getAttributeNamesInScope(PageContext.PAGE_SCOPE);
-			}
-			while (enumeration.hasMoreElements()) {
-				String name = (String) enumeration.nextElement();
-				Object value = null;
-				switch (i) {
-					case 0: value = request.getAttribute(name); break;
-					case 1: value = session.getAttribute(name); break;
-					case 2: value = context.getAttribute(name); break;
-					case 3: value = pageContext.getAttribute(name); break;
-				}
-				result.append(name).append('=');
-				if (value == null) {
-					result.append("<null>\n");
-				} else {
-					String stringValue;
-					try {
-						stringValue = value.toString();
-					} catch (Exception ignore) {
-						stringValue = "<" + value.getClass() + ">\n";
-					}
-					result.append(stringValue).append('\n');
-				}
-			}
-		}
-		return result.toString();
-	}
 
 	// ---------------------------------------------------------------- cache
 

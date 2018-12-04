@@ -25,40 +25,40 @@
 
 package jodd.joy;
 
-import jodd.jtx.JoddJtx;
-import jodd.jtx.proxy.AnnotationTxAdvice;
 import jodd.proxetta.Proxetta;
 import jodd.proxetta.ProxyAspect;
-import jodd.proxetta.ProxyPointcut;
-import jodd.proxetta.impl.ProxyProxetta;
-import jodd.proxetta.pointcuts.MethodWithAnnotationPointcut;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class JoyProxetta extends JoyBase {
+/**
+ * Tiny JoyProxetta kickstarter.
+ */
+public class JoyProxetta extends JoyBase implements JoyProxettaConfig {
 
-	protected ProxyProxetta proxyProxetta;
-
-	public JoyProxetta() {
-		proxyAspects.add(createTxProxyAspects());
-	}
+	protected Proxetta proxetta;
 
 	// ---------------------------------------------------------------- getters
 
 	/**
 	 * Returns proxetta once it is created.
 	 */
-	public ProxyProxetta getProxetta() {
-		return proxyProxetta;
+	public Proxetta getProxetta() {
+		return requireStarted(proxetta);
 	}
 
 	// ---------------------------------------------------------------- config
 
 	private final List<ProxyAspect> proxyAspects = new ArrayList<>();
 
-	public void addProxyAspect(final ProxyAspect proxyAspect) {
+	/**
+	 * Adds a proxy aspect.
+	 */
+	@Override
+	public JoyProxetta addProxyAspect(final ProxyAspect proxyAspect) {
+		requireNotStarted(proxetta);
 		this.proxyAspects.add(proxyAspect);
+		return this;
 	}
 
 	// ---------------------------------------------------------------- lifecycle
@@ -72,7 +72,7 @@ public class JoyProxetta extends JoyBase {
 	 * </ul>
 	 */
 	@Override
-	void start() {
+	public void start() {
 		initLogger();
 
 		log.info("PROXETTA start ----------");
@@ -81,20 +81,16 @@ public class JoyProxetta extends JoyBase {
 
 		log.debug("Total proxy aspects: " + proxyAspectsArray.length);
 
-		proxyProxetta = Proxetta.proxyProxetta().withAspects(proxyAspectsArray);
-	}
+//		proxetta = Proxetta.wrapperProxetta().setCreateTargetInDefaultCtor(true).withAspects(proxyAspectsArray);
 
-	protected ProxyAspect createTxProxyAspects() {
-		return new ProxyAspect(
-			AnnotationTxAdvice.class,
-			((ProxyPointcut)
-				methodInfo -> methodInfo.isPublicMethod() && methodInfo.isTopLevelMethod())
-				.and(MethodWithAnnotationPointcut.of(JoddJtx.defaults().getTxAnnotations()))
-		);
+		proxetta = Proxetta.proxyProxetta().withAspects(proxyAspectsArray);
+
+		log.info("PROXETTA OK!");
 	}
 
 	@Override
-	void stop() {
+	public void stop() {
+		proxetta = null;
 	}
 
 }

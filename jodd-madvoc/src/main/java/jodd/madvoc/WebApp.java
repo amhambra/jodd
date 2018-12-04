@@ -27,14 +27,15 @@ package jodd.madvoc;
 
 import jodd.log.Logger;
 import jodd.log.LoggerFactory;
+import jodd.madvoc.component.ActionConfigManager;
 import jodd.madvoc.component.ActionMethodParamNameResolver;
 import jodd.madvoc.component.ActionMethodParser;
 import jodd.madvoc.component.ActionPathRewriter;
 import jodd.madvoc.component.ActionsManager;
 import jodd.madvoc.component.AsyncActionExecutor;
 import jodd.madvoc.component.ContextInjectorComponent;
+import jodd.madvoc.component.FileUploader;
 import jodd.madvoc.component.FiltersManager;
-import jodd.madvoc.component.InjectorsManager;
 import jodd.madvoc.component.InterceptorsManager;
 import jodd.madvoc.component.MadvocComponentLifecycle;
 import jodd.madvoc.component.MadvocComponentLifecycle.Init;
@@ -42,17 +43,23 @@ import jodd.madvoc.component.MadvocComponentLifecycle.Ready;
 import jodd.madvoc.component.MadvocComponentLifecycle.Start;
 import jodd.madvoc.component.MadvocContainer;
 import jodd.madvoc.component.MadvocController;
+import jodd.madvoc.component.MadvocEncoding;
 import jodd.madvoc.component.ResultMapper;
 import jodd.madvoc.component.ResultsManager;
-import jodd.madvoc.component.ScopeDataResolver;
+import jodd.madvoc.component.RootPackages;
+import jodd.madvoc.component.ScopeDataInspector;
+import jodd.madvoc.component.ScopeResolver;
 import jodd.madvoc.component.ServletContextProvider;
+import jodd.madvoc.meta.Action;
+import jodd.madvoc.meta.RestAction;
 import jodd.props.Props;
 import jodd.util.ClassConsumer;
-import jodd.util.Consumers;
+import jodd.util.function.Consumers;
 
 import javax.servlet.ServletContext;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -85,16 +92,21 @@ public class WebApp {
 
 	protected ServletContext servletContext;
 	private List<Props> propsList = new ArrayList<>();
+	private List<Map<String, Object>> paramsList = new ArrayList<>();
 	private List<ClassConsumer> madvocComponents = new ArrayList<>();
 	private List<Object> madvocComponentInstances = new ArrayList<>();
 	private Consumers<MadvocRouter> madvocRouterConsumers = Consumers.empty();
-	private Consumers<MadvocConfig> madvocConfigConsumers = Consumers.empty();
 
 	/**
 	 * Defines params to load.
 	 */
 	public WebApp withParams(final Props props) {
 		propsList.add(props);
+		return this;
+	}
+
+	public WebApp withParams(final Map<String, Object> params) {
+		paramsList.add(params);
 		return this;
 	}
 
@@ -133,17 +145,17 @@ public class WebApp {
 	}
 
 	/**
-	 * Configures the {@link MadvocConfig}.
+	 * Configures the action configurations.
 	 */
-	public WebApp configure(final Consumer<MadvocConfig> madvocConfigConsumer) {
-		madvocConfigConsumers.add(madvocConfigConsumer);
+	public <A extends ActionConfig> WebApp withActionConfig(final Class<A> actionConfigType, final Consumer<A> actionConfigConsumer) {
+		withRegisteredComponent(ActionConfigManager.class, acm -> acm.with(actionConfigType, actionConfigConsumer));
 		return this;
 	}
 
 	// ---------------------------------------------------------------- main components
 
 	protected final MadvocContainer madvocContainer;
-	protected final Consumers<MadvocContainer> componentConfigs = Consumers.empty();
+	protected Consumers<MadvocContainer> componentConfigs = Consumers.empty();
 
 	public WebApp() {
 		madvocContainer = new MadvocContainer();
@@ -151,7 +163,7 @@ public class WebApp {
 	}
 
 	/**
-	 * Returns {@link MadvocContainer Madvoc container}. It is created very first.
+	 * Returns {@link MadvocContainer Madvoc container} that maintain all Madvoc components.
 	 */
 	public MadvocContainer madvocContainer() {
 		return madvocContainer;
@@ -162,18 +174,28 @@ public class WebApp {
 	 * this method does not register component, just operates on an already registered one.
 	 */
 	public <T> WebApp withRegisteredComponent(final Class<T> madvocComponent, final Consumer<T> componentConsumer) {
-		componentConfigs.add(madvocContainer -> {
-			T component = madvocContainer.lookupComponent(madvocComponent);
-			if (component != null) {
-				componentConsumer.accept(component);
+		if (componentConfigs == null) {
+			// component is already configured
+			final T component = madvocContainer.lookupComponent(madvocComponent);
+			if (component == null) {
+				throw new MadvocException("Component not found: " + madvocComponent.getName());
 			}
-
-		});
+			componentConsumer.accept(component);
+		}
+		else {
+			componentConfigs.add(madvocContainer -> {
+				final T component = madvocContainer.lookupComponent(madvocComponent);
+				if (component == null) {
+					throw new MadvocException("Component not found: " + madvocComponent.getName());
+				}
+				componentConsumer.accept(component);
+			});
+		}
 		return this;
 	}
 
 	/**
-	 * Defines a route using {@link MadvocRouter}.
+	 * Defines a route manually using {@link MadvocRouter}.
 	 */
 	public WebApp router(final Consumer<MadvocRouter> madvocAppConsumer) {
 		madvocRouterConsumers.add(madvocAppConsumer);
@@ -198,18 +220,15 @@ public class WebApp {
 
 		log.debug("Initializing Madvoc WebApp");
 
-		//// props
-		for (Props props : propsList) {
+		//// params & props
+		for (final Map<String, Object> params : paramsList) {
+			madvocContainer.defineParams(params);
+		}
+		for (final Props props : propsList) {
 			madvocContainer.defineParams(props);
 		}
 		propsList = null;
 
-		//// config
-		madvocContainer.registerComponent(MadvocConfig.class);
-		final MadvocConfig madvocConfig = madvocContainer.requestComponent(MadvocConfig.class);
-
-		madvocConfigConsumers.accept(madvocConfig);
-		configureMadvoc(madvocConfig);
 
 		//// components
 		registerMadvocComponents();
@@ -217,15 +236,19 @@ public class WebApp {
 		madvocComponents.forEach(
 			madvocComponent -> madvocContainer.registerComponent(madvocComponent.type(), madvocComponent.consumer()));
 		madvocComponents = null;
+
 		madvocComponentInstances.forEach(madvocContainer::registerComponentInstance);
 		madvocComponentInstances = null;
+
+		configureDefaults();
 
 
 		//// listeners
 		madvocContainer.fireEvent(Init.class);
 
 		//// component configuration
-		componentConfigs.accept(madvocContainer());
+		componentConfigs.accept(madvocContainer);
+		componentConfigs = null;
 
 		initialized();
 
@@ -251,10 +274,14 @@ public class WebApp {
 	}
 
 	/**
-	 * Hook for manual Madvoc configuration. No component is registered yet. You can use
-	 * only {@link MadvocConfig} and {@link MadvocContainer}.
+	 * Configure defaults.
 	 */
-	protected void configureMadvoc(final MadvocConfig madvocConfig) {
+	protected void configureDefaults() {
+		final ActionConfigManager actionConfigManager =
+			madvocContainer.lookupComponent(ActionConfigManager.class);
+
+		actionConfigManager.registerAnnotation(Action.class);
+		actionConfigManager.registerAnnotation(RestAction.class);
 	}
 
 	/**
@@ -267,21 +294,26 @@ public class WebApp {
 
 		log.debug("Registering Madvoc WebApp components");
 
+		madvocContainer.registerComponent(MadvocEncoding.class);
+
 		madvocContainer.registerComponentInstance(new ServletContextProvider(servletContext));
 
+		madvocContainer.registerComponent(ActionConfigManager.class);
 		madvocContainer.registerComponent(ActionMethodParamNameResolver.class);
 		madvocContainer.registerComponent(ActionMethodParser.class);
 		madvocContainer.registerComponent(ActionPathRewriter.class);
 		madvocContainer.registerComponent(ActionsManager.class);
 		madvocContainer.registerComponent(ContextInjectorComponent.class);
-		madvocContainer.registerComponent(InjectorsManager.class);
 		madvocContainer.registerComponent(InterceptorsManager.class);
 		madvocContainer.registerComponent(FiltersManager.class);
 		madvocContainer.registerComponent(MadvocController.class);
+		madvocContainer.registerComponent(RootPackages.class);
 		madvocContainer.registerComponent(ResultsManager.class);
 		madvocContainer.registerComponent(ResultMapper.class);
-		madvocContainer.registerComponent(ScopeDataResolver.class);
+		madvocContainer.registerComponent(ScopeResolver.class);
+		madvocContainer.registerComponent(ScopeDataInspector.class);
 		madvocContainer.registerComponent(AsyncActionExecutor.class);
+		madvocContainer.registerComponent(FileUploader.class);
 	}
 
 	/**

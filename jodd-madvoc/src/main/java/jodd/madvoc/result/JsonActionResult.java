@@ -28,11 +28,10 @@ package jodd.madvoc.result;
 import jodd.io.StreamUtil;
 import jodd.json.JsonSerializer;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.MadvocConfig;
-import jodd.madvoc.ScopeType;
+import jodd.madvoc.component.MadvocEncoding;
 import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
-import jodd.util.net.MimeTypes;
+import jodd.madvoc.meta.scope.MadvocContext;
+import jodd.net.MimeTypes;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.OutputStream;
@@ -42,17 +41,17 @@ import java.io.OutputStream;
  */
 public class JsonActionResult implements ActionResult {
 
-	@In @Scope(ScopeType.CONTEXT)
-	protected MadvocConfig madvocConfig;
+	@In @MadvocContext
+	protected MadvocEncoding madvocEncoding;
 
 	@Override
-	public void render(final ActionRequest actionRequest, final Object object) throws Exception {
-		HttpServletResponse response = actionRequest.getHttpServletResponse();
+	public void render(final ActionRequest actionRequest, final Object resultValue) throws Exception {
+		final HttpServletResponse response = actionRequest.getHttpServletResponse();
 
 		String encoding = response.getCharacterEncoding();
 
 		if (encoding == null) {
-			encoding = madvocConfig.getEncoding();
+			encoding = madvocEncoding.getEncoding();
 		}
 
 		response.setContentType(MimeTypes.MIME_APPLICATION_JSON);
@@ -62,34 +61,30 @@ public class JsonActionResult implements ActionResult {
 		final int status;
 		final String statusMessage;
 
-		if (object instanceof JsonResult) {
-			JsonResult jsonResult = (JsonResult) object;
+		if (resultValue instanceof JsonResult) {
+			JsonResult jsonResult = (JsonResult) resultValue;
 
 			json = jsonResult.value();
 			status = jsonResult.status();
 			statusMessage = jsonResult.message();
 		}
 		else {
-			json = JsonSerializer.create().deep(true).serialize(object);
+			json = JsonSerializer.create().deep(true).serialize(resultValue);
 			status = 200;
 			statusMessage = "OK";
 		}
 
-		byte[] data = json.getBytes(encoding);
+		response.setStatus(status);
+
+		// write data
+
+		final byte[] data = json.getBytes(encoding);
 		response.setContentLength(data.length);
 
 		OutputStream out = null;
 		try {
 			out = response.getOutputStream();
 			out.write(data);
-
-			if (status < 400) {
-				response.setStatus(status);
-			}
-			else {
-				response.sendError(status, statusMessage);
-			}
-
 		} finally {
 			StreamUtil.close(out);
 		}

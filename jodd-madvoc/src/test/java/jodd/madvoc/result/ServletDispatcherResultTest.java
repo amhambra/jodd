@@ -27,7 +27,6 @@ package jodd.madvoc.result;
 
 import jodd.bean.BeanUtil;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocUtil;
 import jodd.madvoc.WebApp;
 import jodd.madvoc.component.MadvocController;
@@ -64,8 +63,6 @@ class ServletDispatcherResultTest {
 				return false;
 			}
 		};
-
-		sdr.madvocConfig = webapp.madvocContainer().lookupComponent(MadvocConfig.class);
 
 		ResultMapper resultMapper = webapp.madvocContainer().lookupComponent(ResultMapper.class);
 		BeanUtil.declared.setProperty(sdr, "resultMapper", resultMapper);
@@ -142,7 +139,6 @@ class ServletDispatcherResultTest {
 		when(httpSession.getServletContext()).thenReturn(servletContext);
 
 		MadvocController madvocController = new MadvocController();
-		MadvocConfig madvocConfig = new MadvocConfig();
 
 		Object action = new Object();
 		ActionRuntime actionRuntime = new ActionRuntime(
@@ -151,7 +147,7 @@ class ServletDispatcherResultTest {
 				ClassUtil.findMethod(Action.class, "view"),
 				null, null,
 				new ActionDefinition(actionPath, "GET"),
-				null, false, null, null, madvocConfig.getActionConfig());
+				ServletDispatcherActionResult.class, null, false, false, null, null);
 
 		return new ActionRequest(madvocController, actionRuntime.getActionPath(), MadvocUtil.splitPathToChunks(actionRuntime.getActionPath()), actionRuntime, action, servletRequest, servletResponse);
 	}

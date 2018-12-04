@@ -31,6 +31,7 @@ import java.util.function.Consumer;
 
 /**
  * Redirect result.
+ * @see PermRedirect
  */
 @RenderWith(ServletRedirectActionResult.class)
 public class Redirect extends PathResult {

@@ -28,7 +28,6 @@ package jodd.mail;
 import com.sun.mail.imap.IMAPSSLStore;
 import jodd.util.StringPool;
 
-import javax.mail.Authenticator;
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.URLName;
@@ -39,25 +38,23 @@ import java.util.Properties;
  */
 public class ImapSslServer extends ImapServer {
 
-	protected static final String MAIL_IMAP_SOCKET_FACTORY_PORT = "mail.imap.socketFactory.port";
-	protected static final String MAIL_IMAP_SOCKET_FACTORY_CLASS = "mail.imap.socketFactory.class";
-	protected static final String MAIL_IMAP_SOCKET_FACTORY_FALLBACK = "mail.imap.socketFactory.fallback";
-
 	/**
 	 * Default IMAP SSL port.
 	 */
 	protected static final int DEFAULT_SSL_PORT = 993;
 
-	public ImapSslServer(final String host, final int port, final Authenticator authenticator) {
-		super(host, port == -1 ? DEFAULT_SSL_PORT : port, authenticator);
+	public ImapSslServer(final Builder builder) {
+		super(builder, DEFAULT_SSL_PORT);
 	}
 
 	@Override
 	protected Properties createSessionProperties() {
-		final Properties props = super.getSessionProperties();
-		props.setProperty(MAIL_IMAP_SOCKET_FACTORY_PORT, String.valueOf(getPort()));
+		final Properties props = super.createSessionProperties();
+
+		props.setProperty(MAIL_IMAP_SOCKET_FACTORY_PORT, String.valueOf(port));
 		props.setProperty(MAIL_IMAP_SOCKET_FACTORY_CLASS, "javax.net.ssl.SSLSocketFactory");
 		props.setProperty(MAIL_IMAP_SOCKET_FACTORY_FALLBACK, StringPool.FALSE);
+
 		return props;
 	}
 
@@ -69,21 +66,21 @@ public class ImapSslServer extends ImapServer {
 	 */
 	@Override
 	protected IMAPSSLStore getStore(final Session session) {
-		SimpleAuthenticator simpleAuthenticator = (SimpleAuthenticator) getAuthenticator();
+		SimpleAuthenticator simpleAuthenticator = (SimpleAuthenticator) authenticator;
 
 		final URLName url;
 
 		if (simpleAuthenticator == null) {
 			url = new URLName(
 				PROTOCOL_IMAP,
-				getHost(), getPort(),
+				host, port,
 				StringPool.EMPTY, null, null);
 		}
 		else {
 			final PasswordAuthentication pa = simpleAuthenticator.getPasswordAuthentication();
 			url = new URLName(
 				PROTOCOL_IMAP,
-				getHost(), getPort(),
+				host, port,
 				StringPool.EMPTY,
 				pa.getUserName(), pa.getPassword());
 		}

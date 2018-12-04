@@ -25,12 +25,13 @@
 
 package jodd.bean;
 
+import jodd.inex.InExRuleMatcher;
+import jodd.inex.InExRules;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.FieldDescriptor;
 import jodd.introspector.MethodDescriptor;
 import jodd.introspector.PropertyDescriptor;
-import jodd.util.inex.InExRuleMatcher;
-import jodd.util.inex.InExRules;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -82,7 +83,7 @@ public abstract class BeanVisitor implements InExRuleMatcher<String, String> {
 	 * Returns all bean property names.
 	 */
 	protected String[] getAllBeanPropertyNames(final Class type, final boolean declared) {
-		ClassDescriptor classDescriptor = JoddBean.defaults().getClassIntrospector().lookup(type);
+		ClassDescriptor classDescriptor = ClassIntrospector.get().lookup(type);
 
 		PropertyDescriptor[] propertyDescriptors = classDescriptor.getAllPropertyDescriptors();
 
@@ -105,7 +106,7 @@ public abstract class BeanVisitor implements InExRuleMatcher<String, String> {
 			}
 		}
 
-		return names.toArray(new String[names.size()]);
+		return names.toArray(new String[0]);
 	}
 
 	/**

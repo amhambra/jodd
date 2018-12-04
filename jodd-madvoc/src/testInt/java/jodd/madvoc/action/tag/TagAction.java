@@ -26,7 +26,7 @@
 package jodd.madvoc.action.tag;
 
 import jodd.bean.BeanCopy;
-import jodd.madvoc.meta.GET;
+import jodd.madvoc.meta.method.GET;
 import jodd.madvoc.meta.In;
 import jodd.madvoc.meta.MadvocAction;
 import jodd.madvoc.meta.RestAction;
@@ -88,4 +88,13 @@ public class TagAction {
 
 		return TextResult.of("save-" + tag);
 	}
+
+
+	@GET @RestAction("boom")
+	public TextResult exception() {
+		int b = 0;
+		int a = 5 / b;
+		return TextResult.of("Hi" + a);
+	}
+
 }

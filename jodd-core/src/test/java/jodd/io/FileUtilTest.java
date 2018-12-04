@@ -25,8 +25,8 @@
 
 package jodd.io;
 
+import jodd.system.SystemUtil;
 import jodd.util.StringUtil;
-import jodd.util.SystemUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -41,6 +41,7 @@ import java.net.URL;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class FileUtilTest {
@@ -264,6 +265,33 @@ class FileUtilTest {
 		assertEquals(content, content163);
 	}
 
+	@Test
+	void testIsAncestor() {
+		File folder = new File("/foo/bar");
+		File file = new File(folder, "foo.txt");
+
+		assertTrue(FileUtil.isAncestor(folder, folder, false));
+		assertFalse(FileUtil.isAncestor(folder, folder, true));
+
+		assertTrue(FileUtil.isAncestor(folder, file, false));
+		assertTrue(FileUtil.isAncestor(folder, file, true));
+
+		file = new File(folder, "../foo.txt");
+
+		assertFalse(FileUtil.isAncestor(folder, file, false));
+		assertFalse(FileUtil.isAncestor(folder, file, true));
+
+		file = new File(folder, "bar/../../../foo.txt");
+
+		assertFalse(FileUtil.isAncestor(folder, file, false));
+		assertFalse(FileUtil.isAncestor(folder, file, true));
+
+		file = new File(folder, "bar/car/../foo.txt");
+
+		assertTrue(FileUtil.isAncestor(folder, file, false));
+		assertTrue(FileUtil.isAncestor(folder, file, true));
+	}
+
 	@ParameterizedTest (name = "{index} : FileUtil#{0}")
 	@CsvSource(
 			{
@@ -351,7 +379,7 @@ class FileUtilTest {
 
 		@Test
 		void file_not_exists() throws Exception {
-			final File input = FileUtil.createTempFile("hello", ".jodd", new File(SystemUtil.tempDir()), false);
+			final File input = FileUtil.createTempFile("hello", ".jodd", new File(SystemUtil.info().getTempDir()), false);
 
 			final boolean actual = FileUtil.isExistingFile(input);
 
@@ -384,7 +412,7 @@ class FileUtilTest {
 
 		@Test
 		void folder_not_exists() throws Exception {
-			final File input = new File(SystemUtil.tempDir(), "/folder-does-not-exists");
+			final File input = new File(SystemUtil.info().getTempDir(), "/folder-does-not-exists");
 
 			final boolean actual = FileUtil.isExistingFolder(input);
 

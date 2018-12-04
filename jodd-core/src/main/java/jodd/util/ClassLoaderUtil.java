@@ -25,16 +25,16 @@
 
 package jodd.util;
 
-import jodd.core.JavaBridge;
-import jodd.core.JoddCore;
+import jodd.Jodd;
+import jodd.bridge.ClassPathURLs;
 import jodd.io.FileUtil;
 import jodd.io.StreamUtil;
+import jodd.util.cl.ClassLoaderStrategy;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.AccessController;
@@ -89,33 +89,6 @@ public class ClassLoaderUtil {
 		else {
 			return AccessController.doPrivileged(
 				(PrivilegedAction<ClassLoader>) ClassLoader::getSystemClassLoader);
-		}
-	}
-
-	// ---------------------------------------------------------------- define class
-
-	/**
-	 * Defines a class from byte array into the system class loader.
-	 * @see #defineClass(String, byte[], ClassLoader)
-	 */
-	public static Class defineClass(final String className, final byte[] classData) {
-		return defineClass(className, classData, getDefaultClassLoader());
-	}
-
-	/**
-	 * Defines a class from byte array into the specified class loader.
-	 * Warning: this is a <b>hack</b>!
-	 * @param className optional class name, may be <code>null</code>
-	 * @param classData bytecode data
-	 * @param classLoader classloader that will load class
-	 */
-	public static Class defineClass(final String className, final byte[] classData, final ClassLoader classLoader) {
-		try {
-			Method defineClassMethod = ClassLoader.class.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-			defineClassMethod.setAccessible(true);
-			return (Class) defineClassMethod.invoke(classLoader, className, classData, 0, classData.length);
-		} catch (Throwable th) {
-			throw new RuntimeException("Define class failed: " + className, th);
 		}
 	}
 
@@ -203,7 +176,7 @@ public class ClassLoaderUtil {
 		Set<File> classpaths = new TreeSet<>();
 
 		while (classLoader != null) {
-			URL[] urls = JavaBridge.getURLs(classLoader);
+			URL[] urls = ClassPathURLs.of(classLoader, null);
 			if (urls != null) {
 				for (URL u : urls) {
 					File f = FileUtil.toContainerFile(u);
@@ -423,7 +396,7 @@ public class ClassLoaderUtil {
 	 * @see jodd.util.cl.DefaultClassLoaderStrategy
 	 */
 	public static Class loadClass(final String className) throws ClassNotFoundException {
-		return JoddCore.defaults().getClassLoaderStrategy().loadClass(className, null);
+		return ClassLoaderStrategy.get().loadClass(className, null);
 	}
 	
 	/**
@@ -431,7 +404,25 @@ public class ClassLoaderUtil {
 	 * @see jodd.util.cl.DefaultClassLoaderStrategy
 	 */
 	public static Class loadClass(final String className, final ClassLoader classLoader) throws ClassNotFoundException {
-		return JoddCore.defaults().getClassLoaderStrategy().loadClass(className, classLoader);
+		return ClassLoaderStrategy.get().loadClass(className, classLoader);
+	}
+
+	// ---------------------------------------------------------------- class location
+
+	/**
+	 * Returns location of the class. If class is not in a jar, it's classpath
+	 * is returned; otherwise the jar location.
+	 */
+	public static String classLocation(final Class clazz) {
+		return clazz.getProtectionDomain().getCodeSource().getLocation().getPath();
+	}
+
+	/**
+	 * Returns Jodd {@link #classLocation(Class) location}.
+	 * @see #classLocation
+	 */
+	public static String joddLocation() {
+		return classLocation(Jodd.class);
 	}
 
 }

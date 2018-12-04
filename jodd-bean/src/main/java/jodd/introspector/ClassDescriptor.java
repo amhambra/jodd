@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * A descriptor class for all methods/fields/properties/constructors of a class.
@@ -58,7 +59,6 @@ public class ClassDescriptor {
 	protected final String[] propertyFieldPrefix;
 	protected final Class[] interfaces;
 	protected final Class[] superclasses;
-	protected int usageCount;
 
 	public ClassDescriptor(final Class type, final boolean scanAccessible, final boolean extendedProperties, final boolean includeFieldsAsProperties, final String[] propertyFieldPrefix) {
 		this.type = type;
@@ -72,6 +72,7 @@ public class ClassDescriptor {
 		isList = ClassUtil.isTypeOf(type, List.class);
 		isSet = ClassUtil.isTypeOf(type, Set.class);
 		isCollection = ClassUtil.isTypeOf(type, Collection.class);
+		isSupplier = ClassUtil.isTypeOf(type, Supplier.class);
 
 		interfaces = ClassUtil.resolveAllInterfaces(type);
 		superclasses = ClassUtil.resolveAllSuperclasses(type);
@@ -117,23 +118,6 @@ public class ClassDescriptor {
 		return propertyFieldPrefix;
 	}
 
-	/**
-	 * Increases usage count.
-	 */
-	protected void increaseUsageCount() {
-		usageCount++;
-	}
-
-	/**
-	 * Returns number of class descriptor usages. That is number
-	 * of times when class descriptor for some class has been
-	 * lookuped. Higher usage count means that some class is
-	 * more frequently being used.
-	 */
-	public int getUsageCount() {
-		return usageCount;
-	}
-
 	// ---------------------------------------------------------------- special
 
 	private final boolean isArray;
@@ -176,6 +160,14 @@ public class ClassDescriptor {
 		return isCollection;
 	}
 
+	private final boolean isSupplier;
+
+	/**
+	 * Returns <code>true</code> if type is a supplier.
+	 */
+	public boolean isSupplier() {
+		return isSupplier;
+	}
 	// ---------------------------------------------------------------- fields
 
 	private Fields fields;

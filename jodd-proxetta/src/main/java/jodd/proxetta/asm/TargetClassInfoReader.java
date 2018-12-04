@@ -28,10 +28,10 @@ package jodd.proxetta.asm;
 import jodd.asm.AsmUtil;
 import jodd.asm.EmptyClassVisitor;
 import jodd.asm.EmptyMethodVisitor;
-import jodd.asm6.AnnotationVisitor;
-import jodd.asm6.ClassReader;
-import jodd.asm6.MethodVisitor;
-import jodd.asm6.signature.SignatureReader;
+import jodd.asm7.AnnotationVisitor;
+import jodd.asm7.ClassReader;
+import jodd.asm7.MethodVisitor;
+import jodd.asm7.signature.SignatureReader;
 import jodd.io.StreamUtil;
 import jodd.proxetta.AnnotationInfo;
 import jodd.proxetta.ClassInfo;
@@ -131,17 +131,17 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 		return annotations;
 	}
 
-	@Override
-	public Map<String, String> getGenerics() {
-		return generics;
-	}
+//	@Override
+//	public Map<String, String> getGenerics() {
+//		return generics;
+//	}
 
 	// ---------------------------------------------------------------- visits
 
 
 	@Override
 	public void visit(final int version, final int access, final String name, final String signature, final String superName, final String[] interfaces) {
-		int lastSlash = name.lastIndexOf('/');
+		final int lastSlash = name.lastIndexOf('/');
 		this.thisReference = name;
 		this.superName = superName;
 		this.nextSupername = superName;
@@ -174,10 +174,10 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 	 */
 	@Override
 	public MethodVisitor visitMethod(final int access, final String name, final String desc, final String signature, final String[] exceptions) {
-		if ((access & AsmUtil.ACC_FINAL) != 0) {
-			return null;	// skip finals
-		}
-		MethodSignatureVisitor msign = createMethodSignature(access, name, desc, signature, exceptions, thisReference);
+//		if ((access & AsmUtil.ACC_FINAL) != 0) {
+//			return null;	// skip finals
+//		}
+		MethodSignatureVisitor msign = createMethodSignature(access, name, desc, signature, exceptions, thisReference, this.generics);
 		String key = ProxettaAsmUtil.createMethodSignaturesKey(access, name, desc, thisReference);
 		methodSignatures.put(key, msign);
 		allMethodSignatures.add(msign.getCleanSignature());
@@ -193,7 +193,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 
 		// prepare class annotations
 		if (classAnnotations != null) {
-			annotations = classAnnotations.toArray(new AnnotationInfo[classAnnotations.size()]);
+			annotations = classAnnotations.toArray(new AnnotationInfo[0]);
 			classAnnotations = null;
 		}
 
@@ -227,7 +227,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 				Collections.addAll(allInterfaces, cr.getInterfaces());
 			}
 		}
-		superClasses = superList.toArray(new String[superList.size()]);
+		superClasses = superList.toArray(new String[0]);
 
 		// check all interface methods that are not overridden in super-interface
 
@@ -280,8 +280,15 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 	/**
 	 * Creates method signature from method name.
 	 */
-	protected MethodSignatureVisitor createMethodSignature(final int access, final String methodName, final String description, final String signature, final String[] exceptions, final String classname) {
-		MethodSignatureVisitor v = new MethodSignatureVisitor(methodName, access, classname, description, exceptions, signature, this);
+	protected MethodSignatureVisitor createMethodSignature(
+			final int access,
+			final String methodName,
+			final String description,
+			final String signature,
+			final String[] exceptions,
+			final String classname,
+			final Map<String, String> declaredTypeGenerics) {
+		MethodSignatureVisitor v = new MethodSignatureVisitor(methodName, access, classname, description, exceptions, signature, declaredTypeGenerics, this);
 		new SignatureReader(signature != null ? signature : description).accept(v);
 		return v;
 	}
@@ -327,7 +334,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 		public void visitEnd() {
 			if (!methodAnns.isEmpty()) {
 				// method annotations
-				msign.annotations = methodAnns.toArray(new AnnotationInfo[methodAnns.size()]);
+				msign.annotations = methodAnns.toArray(new AnnotationInfo[0]);
 			}
 
 			// arguments annotations
@@ -336,7 +343,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 				List<AnnotationInfo> methodParamsAnn = methodParamsAnns[i];
 
 				if (methodParamsAnn != null) {
-					msign.getArgument(i + 1).annotations = methodParamsAnn.toArray(new AnnotationInfo[methodParamsAnn.size()]);
+					msign.getArgument(i + 1).annotations = methodParamsAnn.toArray(new AnnotationInfo[0]);
 				}
 			}
 		}
@@ -347,6 +354,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 	private class SuperClassVisitor extends EmptyClassVisitor {
 
 		String declaredClassName;
+		Map<String, String> superGeneric;
 
 		@Override
 		public void visit(final int version, final int access, final String name, final String signature, final String superName, final String[] interfaces) {
@@ -360,6 +368,8 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 				}
 			}
 
+			final boolean isInterface = (access & AsmUtil.ACC_INTERFACE) != 0;
+			this.superGeneric = new GenericsReader().parseSignatureForGenerics(signature, isInterface);
 		}
 
 		@Override
@@ -375,7 +385,7 @@ public class TargetClassInfoReader extends EmptyClassVisitor implements ClassInf
 				return null;
 			}
 
-			MethodSignatureVisitor msign = createMethodSignature(access, name, desc, signature, exceptions, thisReference);
+			MethodSignatureVisitor msign = createMethodSignature(access, name, desc, signature, exceptions, thisReference, this.superGeneric);
 			if (allMethodSignatures.contains(msign.getCleanSignature())) {		// skip overridden method by some in above classes
 				return null;
 			}

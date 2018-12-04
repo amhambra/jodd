@@ -29,10 +29,14 @@ import jodd.json.fixtures.JsonParsers;
 import jodd.json.fixtures.model.FileMan;
 import jodd.json.fixtures.model.HitList;
 import jodd.json.fixtures.model.State;
+import jodd.json.impl.EmptyJsonSerializer;
 import jodd.json.meta.JSON;
 import jodd.json.meta.JsonAnnotationManager;
-import jodd.util.SystemUtil;
+import jodd.json.meta.TypeData;
+import jodd.system.SystemUtil;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -50,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class JsonSerializerTest {
 
@@ -341,9 +344,9 @@ class JsonSerializerTest {
 
 	@Test
 	void testClass() {
-		String json = new JsonSerializer().serialize(JoddJson.class);
+		String json = new JsonSerializer().serialize(JsonSerializerTest.class);
 
-		assertEquals("\"" + JoddJson.class.getName() + "\"", json);
+		assertEquals("\"" + JsonSerializerTest.class.getName() + "\"", json);
 	}
 
 	@JSON(strict = false)
@@ -389,7 +392,7 @@ class JsonSerializerTest {
 		Cook cook = new Cook();
 		JsonAnnotationManager jam = JsonAnnotationManager.get();
 
-		JsonAnnotationManager.TypeData typeData = jam.lookupTypeData(Cook.class);
+		TypeData typeData = jam.lookupTypeData(Cook.class);
 
 		assertEquals(1, typeData.rules.totalIncludeRules());
 		assertEquals(1, typeData.rules.totalExcludeRules());
@@ -554,30 +557,85 @@ class JsonSerializerTest {
 		assertEquals("{\"one\":{\"id\":1}}", json);
 	}
 
-	@Test
-	void testFiles_on_linux() {
-		assumeTrue(SystemUtil.isHostLinux() || SystemUtil.isHostMac(), "no linux host");
 
+	@Test
+	void testExcludeNullCollections() {
+		Map<String, Object> map = new HashMap<>();
+		map.put("a", null);
+
+		String json = new JsonSerializer().serialize(map);
+		assertEquals("{\"a\":null}", json);
+
+		json = new JsonSerializer().excludeNulls(true).serialize(map);
+		assertEquals("{}", json);
+
+		map.put("b", new HashMap<>());
+		json = new JsonSerializer().excludeNulls(true).serialize(map);
+		assertEquals("{\"b\":{}}", json);
+
+		json = new JsonSerializer().excludeNulls(true).onValue(value -> {
+			if (value instanceof Map) {
+				if (((Map)value).isEmpty()) {
+					return new EmptyJsonSerializer();
+				}
+			}
+			return null;
+		}).serialize(map);
+		assertEquals("{}", json);
+	}
+
+	@Test
+	void testExcludeNullEmpty() {
+		Map<String, Object> map = new HashMap<>();
+		map.put("a", null);
+
+		map.put("b", new HashMap<>());
+
+		String json = new JsonSerializer().excludeNulls(true).serialize(map);
+		assertEquals("{\"b\":{}}", json);
+
+		json = new JsonSerializer().excludeNulls(true).excludeEmpty(true).serialize(map);
+		assertEquals("{}", json);
+
+		map.put("c", new ArrayList<>());
+		json = new JsonSerializer().excludeNulls(true).excludeEmpty(true).serialize(map);
+		assertEquals("{}", json);
+
+		map.put("d", new int[0]);
+		json = new JsonSerializer().excludeNulls(true).excludeEmpty(true).serialize(map);
+		assertEquals("{}", json);
+
+		map.put("e", new HashSet<>());
+		json = new JsonSerializer().excludeNulls(true).excludeEmpty(true).serialize(map);
+		assertEquals("{}", json);
+
+		map.put("f", new Object[0]);
+		json = new JsonSerializer().excludeNulls(true).excludeEmpty(true).serialize(map);
+		assertEquals("{}", json);
+	}
+
+	@Test
+	@EnabledOnOs(value = {OS.AIX, OS.LINUX, OS.MAC, OS.SOLARIS})
+	void testFiles_on_linux() {
 		FileMan fileMan = new FileMan();
-		File userHome = new File(SystemUtil.userHome());
+		File userHome = new File(SystemUtil.info().getHomeDir());
 		fileMan.setFile(userHome);
 
 		String json = JsonSerializer.create().serialize(fileMan);
 
-		assertTrue(json.contains(SystemUtil.userHome()));
+		assertTrue(json.contains(SystemUtil.info().getHomeDir()));
 	}
 
 	@Test
+	@EnabledOnOs(value = {OS.WINDOWS})
 	void testFiles_on_windows() {
-		assumeTrue(SystemUtil.isHostWindows(), "no windows host");
-
 		FileMan fileMan = new FileMan();
-		File userHome = new File(SystemUtil.userHome());
+		File userHome = new File(SystemUtil.info().getHomeDir());
 		fileMan.setFile(userHome);
 
 		final String json = JsonSerializer.create().serialize(fileMan);
 		// C:\Users\xxxx will be user home on windows hsost;  char '\' is escpaed in json therefore the execution of "String#replace"
-		final String userhome_escpaed = SystemUtil.userHome().replace("\\", "\\\\");
+		final String userhome_escpaed = SystemUtil.info().getHomeDir().replace("\\", "\\\\");
 		assertTrue(json.contains(userhome_escpaed));
 	}
 
@@ -585,11 +643,11 @@ class JsonSerializerTest {
 	void testSerializeSets() {
 		HitList hitList = new HitList();
 
-		hitList.setNames(new HashSet<String>());
+		hitList.setNames(new HashSet<>());
 		hitList.getNames().add("Joe");
 		hitList.getNames().add("Pig");
 
-		hitList.setNumbers(new HashSet<Integer>());
+		hitList.setNumbers(new HashSet<>());
 		hitList.getNumbers().add(173);
 		hitList.getNumbers().add(22);
 

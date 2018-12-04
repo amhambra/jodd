@@ -27,10 +27,9 @@ package jodd.madvoc.result;
 
 import jodd.io.StreamUtil;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.MadvocConfig;
-import jodd.madvoc.ScopeType;
+import jodd.madvoc.component.MadvocEncoding;
 import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
+import jodd.madvoc.meta.scope.MadvocContext;
 import jodd.util.StringPool;
 
 import javax.servlet.http.HttpServletResponse;
@@ -41,25 +40,39 @@ import java.io.OutputStream;
  * Useful for JSON responses, when resulting string is built
  * in the action.
  */
-public class TextActionResult implements ActionResult<TextResult> {
+public class TextActionResult implements ActionResult {
 
-	@In @Scope(ScopeType.CONTEXT)
-	protected MadvocConfig madvocConfig;
+	@In @MadvocContext
+	protected MadvocEncoding madvocEncoding;
 
 	@Override
-	public void render(final ActionRequest actionRequest, final TextResult resultValue) throws Exception {
+	public void render(final ActionRequest actionRequest, final Object resultValue) throws Exception {
+		final TextResult textResult;
+
+		if (resultValue == null) {
+			textResult = TextResult.of(StringPool.EMPTY);
+		} else {
+			if (resultValue instanceof String) {
+				textResult = TextResult.of((String)resultValue);
+			}
+			else {
+				textResult = (TextResult) resultValue;
+			}
+		}
+
 		final HttpServletResponse response = actionRequest.getHttpServletResponse();
 
 		String encoding = response.getCharacterEncoding();
 
 		if (encoding == null) {
-			encoding = madvocConfig.getEncoding();
+			encoding = madvocEncoding.getEncoding();
 		}
 
-		response.setContentType(resultValue.contentType());
+		response.setContentType(textResult.contentType());
 		response.setCharacterEncoding(encoding);
+		response.setStatus(textResult.status());
 
-		String text = resultValue.value();
+		String text = textResult.value();
 
 		if (text == null) {
 			text = StringPool.EMPTY;

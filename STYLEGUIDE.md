@@ -1,10 +1,10 @@
 # Styleguide and Naming conventions
 
-Please follow this style guide and naming conventions when sending your submissions. Thank you! 
+Please follow this style guide and naming conventions when sending your submissions. Thank you!
 
 ## Code :coffee:
 
-+ Use **TABS** and not spaces for indentation. We just had to choose one. 
++ Use **TABS** and not spaces for indentation. We just had to choose one.
 + Interfaces may contain static factories for known implementations. Examples:
 ```java
 	Value.of(123);      // creates a value
@@ -18,6 +18,7 @@ Please follow this style guide and naming conventions when sending your submissi
 + Returning `null` should be generally avoided for the public methods.
 + Only beans have accessors (`getFoo()` and `setFoo()` methods). Method should not be named with e.g. `get` if it is not a bean.
 + Util static methods that return new instance should be named e.g. `create()` or `createFooBar()` if there is no argument or `fooBarOf(argument)` if there is an argument provided; but _never_ `getFooBar()`. Getters should never create a new instance of anything.
++ _Builder_ pattern function should be named `create()`. Final builder method (that actually returns instance that is building) should be named `get()` or `buildFoo()`.
 + Use `_this()` for base abstract classes of some fluent interfaces API:
 ```java
 	@SuppressWarnings("unchecked")
@@ -27,9 +28,53 @@ Please follow this style guide and naming conventions when sending your submissi
 ```
 + Use `final` method arguments.
 
+### Singletons, implementations and defaults
+
+_Singletons_ are generally avoided. Singletons have static method `get()` used to fetch the singleton instange:
+
+```java
+public class MyFoo {
+    private static final MyFoo MY_FOO = new MyFoo();
+
+    public static MyFoo get() {
+        return MY_FOO;
+    }
+}
+```
+
+_Default implementations_ of some interface are stored in static class named `Implementation`.
+To emphasize the changing of the value, the `set()` method is part of the `Implementation` inner class.
+
+```java
+public static interface MyFoo {
+    class Implementation {
+    	private static MyFoo myFoo = new DefaultMyFoo();
+    	public static void set(MyFoo myFoo) {
+    		this.myFoo = myFoo;
+    	}
+    }
+
+    public static MyFoo get() {
+        return Implementation.myFoo;
+    }
+}
+```
+
+_Defaults_ is configuration for classes that are created by user directly (such as `JsonParser` or `HttpRequest`).
+Those classes may have some defaults so you don't need to change them all the time. Default configuration
+does not have sense on singletons! Inner class `Defaults` should contain only public static fields of common types.
+
+```java
+public class MyFoo {
+	public static class Defaults {
+		public static boolean someFlag = false;
+	}
+}
+```
+
 ### About deprecation and @Since tag
 
-For now, we are _not_ able to maintain deprecated methods and the use of `@Since` tag versions. We simply don't have enough resources for that atm, sorry. It's better not to have it, but to have it all wrong. 
+For now, we are _not_ able to maintain deprecated methods and the use of `@Since` tag versions. We simply don't have enough resources for that atm, sorry. It's better not to have it, but to have it all wrong.
 
 
 ## Test :hearts:
@@ -52,16 +97,16 @@ class FooTest {
 	void testSomething() {
 	  // test code
 	}
-	
+
 	@Nested
 	@DisplayName("tests for a feature set")
 	class FeatureSet {
-		
+
 		@Test
 		void testFeature_with_null() {
-		  // test code  
+		  // test code
 		}
-	
+
 		@Test
 		void testFeature_with_something_else() {
 		  // test code
@@ -77,12 +122,3 @@ class FooTest {
 + Benchmark methods are annotated with an annotation.
 + Don't use `BlackHole` argument if you can return the value.
 + Each benchmark class must contain results in the Javadoc of the class: just copy/paste whatever is the JMH output.
-
-## Modules :rocket:
-
-+ Jodd module has `get()` static method that returns the module instance.
-+ Default configuration of the module is stored as a bean in modules instance. Try to minimise usage of this static call - rather get a value and pass it as an argument, then to fetch the value twice. Default configuration is a bean. Configuration can be split in multiple beans.  
-+ Module instance may have set of runtime components - parts of the module that represents some logic. 
-+ Do not store module's configuration as a constant. We expect config may change in the runtime.
-+ Components are returned using methods without the `get` prefix.
-+ Main components should have self-describing interface.

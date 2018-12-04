@@ -28,7 +28,7 @@ package jodd.util;
 import jodd.exception.UncheckedException;
 import jodd.io.StreamUtil;
 import jodd.io.findfile.ClassScanner;
-import jodd.util.template.StringTemplateParser;
+import jodd.template.StringTemplateParser;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -209,13 +209,13 @@ public class PropertiesUtil {
 	 * Loads properties from classpath file(s). Properties are specified using wildcards.
 	 */
 	public static Properties loadFromClasspath(final Properties p, final String... rootTemplate) {
-			ClassScanner.get()
-				.onEntry(entryData -> UncheckedException.runAndWrapException(() -> p.load(entryData.openInputStream())))
-			.includeResources(true)
-			.ignoreException(true)
-			.excludeAllEntries(true)
-			.includeEntries(rootTemplate)
-			.scanDefaultClasspath();
+			ClassScanner.create()
+				.registerEntryConsumer(entryData -> UncheckedException.runAndWrapException(() -> p.load(entryData.openInputStream())))
+				.includeResources(true)
+				.ignoreException(true)
+				.excludeAllEntries(true)
+				.includeEntries(rootTemplate)
+				.scanDefaultClasspath();
 		return p;
 	}
 

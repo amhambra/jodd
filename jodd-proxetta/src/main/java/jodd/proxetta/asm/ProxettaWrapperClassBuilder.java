@@ -26,20 +26,21 @@
 package jodd.proxetta.asm;
 
 import jodd.asm.AsmUtil;
-import jodd.asm6.ClassVisitor;
-import jodd.asm6.FieldVisitor;
-import jodd.asm6.MethodVisitor;
-import jodd.asm6.Opcodes;
+import jodd.asm7.ClassVisitor;
+import jodd.asm7.FieldVisitor;
+import jodd.asm7.MethodVisitor;
+import jodd.asm7.Opcodes;
 import jodd.proxetta.ProxyAspect;
 
+import java.lang.reflect.Modifier;
 import java.util.List;
 
-import static jodd.asm6.Opcodes.ACC_ABSTRACT;
-import static jodd.asm6.Opcodes.ACC_NATIVE;
-import static jodd.asm6.Opcodes.ALOAD;
-import static jodd.asm6.Opcodes.GETFIELD;
-import static jodd.asm6.Opcodes.INVOKEINTERFACE;
-import static jodd.asm6.Opcodes.INVOKEVIRTUAL;
+import static jodd.asm7.Opcodes.ACC_ABSTRACT;
+import static jodd.asm7.Opcodes.ACC_NATIVE;
+import static jodd.asm7.Opcodes.ALOAD;
+import static jodd.asm7.Opcodes.GETFIELD;
+import static jodd.asm7.Opcodes.INVOKEINTERFACE;
+import static jodd.asm7.Opcodes.INVOKEVIRTUAL;
 import static jodd.proxetta.asm.ProxettaAsmUtil.CLINIT;
 import static jodd.proxetta.asm.ProxettaAsmUtil.INIT;
 import static jodd.proxetta.asm.ProxettaAsmUtil.loadVirtualMethodArguments;
@@ -50,6 +51,7 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 	protected final Class targetClassOrInterface;
 	protected final Class targetInterface;
 	protected final String targetFieldName;
+	protected final boolean createTargetInDefaultCtor;
 
 	public ProxettaWrapperClassBuilder(
 		final Class targetClassOrInterface,
@@ -59,12 +61,17 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 		final ProxyAspect[] aspects,
 		final String suffix,
 		final String reqProxyClassName,
-		final TargetClassInfoReader targetClassInfoReader) {
+		final TargetClassInfoReader targetClassInfoReader,
+		final boolean createTargetInDefaultCtor
+		) {
 
 		super(dest, aspects, suffix, reqProxyClassName, targetClassInfoReader);
 		this.targetClassOrInterface = targetClassOrInterface;
 		this.targetInterface = targetInterface;
 		this.targetFieldName = targetFieldName;
+		this.createTargetInDefaultCtor = createTargetInDefaultCtor;
+
+		wd.allowFinalMethods = true;
 	}
 
 	/**
@@ -100,7 +107,8 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 				//interfaces = null;
 			}
 		}
-		wd.dest.visit(version, access, wd.thisReference, signature, wd.superName, interfaces);
+		final int v = ProxettaAsmUtil.resolveJavaVersion(version);
+		wd.dest.visit(v, access, wd.thisReference, signature, wd.superName, interfaces);
 
 		wd.proxyAspects = new ProxyAspectData[aspects.length];
 		for (int i = 0; i < aspects.length; i++) {
@@ -110,17 +118,29 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 		// create new field wrapper field and store it's reference into work-data
 		wd.wrapperRef = targetFieldName;
 		wd.wrapperType = 'L' + name + ';';
-		FieldVisitor fv  = wd.dest.visitField(AsmUtil.ACC_PUBLIC, wd.wrapperRef, wd.wrapperType, null, null);
-		fv.visitEnd();
 
-		createEmptyCtor();
+
+		if (createTargetInDefaultCtor) {
+			// create private, final field
+			final FieldVisitor fv = wd.dest.visitField(AsmUtil.ACC_PRIVATE | AsmUtil.ACC_FINAL, wd.wrapperRef, wd.wrapperType, null, null);
+			fv.visitEnd();
+
+			createEmptyCtorThatCreatesTarget();
+		}
+		else {
+			// create public, non-final field
+			final FieldVisitor fv = wd.dest.visitField(AsmUtil.ACC_PUBLIC, wd.wrapperRef, wd.wrapperType, null, null);
+			fv.visitEnd();
+
+			createEmptyCtor();
+		}
 	}
 
 	/**
 	 * Created empty default constructor.
 	 */
 	protected void createEmptyCtor() {
-		MethodVisitor mv = wd.dest.visitMethod(AsmUtil.ACC_PUBLIC, INIT, "()V", null, null);
+		final MethodVisitor mv = wd.dest.visitMethod(AsmUtil.ACC_PUBLIC, INIT, "()V", null, null);
 		mv.visitCode();
 		mv.visitVarInsn(Opcodes.ALOAD, 0);
 		mv.visitMethodInsn(
@@ -130,6 +150,35 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 			false);
 		mv.visitInsn(Opcodes.RETURN);
 		mv.visitMaxs(1, 1);
+		mv.visitEnd();
+	}
+
+	protected void createEmptyCtorThatCreatesTarget() {
+		final MethodVisitor mv = wd.dest.visitMethod(AsmUtil.ACC_PUBLIC, "<init>", "()V", null, null);
+		mv.visitCode();
+		mv.visitVarInsn(ALOAD, 0);
+		mv.visitMethodInsn(
+			Opcodes.INVOKESPECIAL,
+			AsmUtil.SIGNATURE_JAVA_LANG_OBJECT,
+			INIT, "()V",
+			false);
+		mv.visitVarInsn(ALOAD, 0);
+
+		mv.visitTypeInsn(Opcodes.NEW, wd.superReference);
+		mv.visitInsn(Opcodes.DUP);
+		mv.visitMethodInsn(
+			Opcodes.INVOKESPECIAL,
+			wd.superReference,
+			INIT, "()V",
+			false);
+
+		mv.visitFieldInsn(Opcodes.PUTFIELD,
+			wd.thisReference,
+			wd.wrapperRef,
+			wd.wrapperType);
+
+		mv.visitInsn(Opcodes.RETURN);
+		mv.visitMaxs(3, 1);
 		mv.visitEnd();
 	}
 
@@ -150,6 +199,11 @@ public class ProxettaWrapperClassBuilder extends ProxettaClassBuilder {
 		}
 		// ignore all destination static block
 		if (name.equals(CLINIT)) {
+			return null;
+		}
+
+		// skip all static methods
+		if (Modifier.isStatic(access)) {
 			return null;
 		}
 

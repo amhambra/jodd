@@ -25,17 +25,17 @@
 
 package jodd.petite;
 
-import jodd.bean.JoddBean;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.FieldDescriptor;
 import jodd.introspector.MethodDescriptor;
 import jodd.introspector.PropertyDescriptor;
 import jodd.petite.def.ValueInjectionPoint;
 import jodd.petite.meta.PetiteValue;
+import jodd.template.ContextTemplateParser;
+import jodd.template.MapTemplateParser;
 import jodd.util.PropertiesUtil;
 import jodd.util.StringPool;
-import jodd.util.template.ContextTemplateParser;
-import jodd.util.template.MapTemplateParser;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -98,12 +98,12 @@ public class ParamManager {
 		if (list.isEmpty()) {
 			return StringPool.EMPTY_ARRAY;
 		} else {
-			return list.toArray(new String[list.size()]);
+			return list.toArray(new String[0]);
 		}
 	}
 
-	public ValueInjectionPoint[] resolveParamInjectionPoints(final Object bean) {
-		final ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(bean.getClass());
+	public ValueInjectionPoint[] resolveParamInjectionPoints(final Class type) {
+		final ClassDescriptor cd = ClassIntrospector.get().lookup(type);
 
 		final List<ValueInjectionPoint> valueInjectionPointList = new ArrayList<>();
 
@@ -130,7 +130,7 @@ public class ParamManager {
 			}
 		}
 
-		return valueInjectionPointList.toArray(new ValueInjectionPoint[valueInjectionPointList.size()]);
+		return valueInjectionPointList.toArray(new ValueInjectionPoint[0]);
 	}
 
 }

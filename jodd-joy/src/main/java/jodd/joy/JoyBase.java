@@ -29,7 +29,7 @@ import jodd.log.Logger;
 import jodd.log.LoggerFactory;
 
 /**
- * Base class for all Joy components.
+ * Base class for all Joy kickstarters.
  */
 public abstract class JoyBase {
 
@@ -51,11 +51,25 @@ public abstract class JoyBase {
 	/**
 	 * Starts the Joy component.
 	 */
-	abstract void start();
+	public abstract void start();
 
 	/**
 	 * Stops the Joy component.
 	 */
-	abstract void stop();
+	public abstract void stop();
+
+	// ---------------------------------------------------------------- util
+
+	protected void requireNotStarted(final Object object) {
+		if (object != null) {
+			throw new JoyException("Configuration is modified after component is started.");
+		}
+	}
+	protected <T> T requireStarted(final T object) {
+		if (object == null) {
+			throw new JoyException("Component is not started yet and can not be used.");
+		}
+		return object;
+	}
 
 }

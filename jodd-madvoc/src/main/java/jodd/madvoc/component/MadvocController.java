@@ -28,7 +28,6 @@ package jodd.madvoc.component;
 import jodd.log.Logger;
 import jodd.log.LoggerFactory;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocException;
 import jodd.madvoc.MadvocUtil;
 import jodd.madvoc.config.ActionRuntime;
@@ -46,12 +45,12 @@ import javax.servlet.http.HttpServletResponse;
  * It also builds action objects and result paths. It handles initialization of
  * interceptors and results.
  */
-public class MadvocController implements MadvocComponentLifecycle.Ready {
+public class MadvocController extends MadvocControllerCfg implements MadvocComponentLifecycle.Ready{
 
 	private static final Logger log = LoggerFactory.getLogger(MadvocController.class);
 
 	@PetiteInject
-	protected MadvocConfig madvocConfig;
+	protected MadvocEncoding madvocEncoding;
 
 	@PetiteInject
 	protected ActionsManager actionsManager;
@@ -67,7 +66,6 @@ public class MadvocController implements MadvocComponentLifecycle.Ready {
 
 	@PetiteInject
 	protected AsyncActionExecutor asyncActionExecutor;
-
 
 	@Override
 	public void ready() {
@@ -93,11 +91,12 @@ public class MadvocController implements MadvocComponentLifecycle.Ready {
 	 * On first invoke, initializes the action runtime before further proceeding.
 	 */
 	public String invoke(String actionPath, final HttpServletRequest servletRequest, final HttpServletResponse servletResponse) throws Exception {
+		final String originalActionPath = actionPath;
 		boolean characterEncodingSet = false;
 
 		while (actionPath != null) {
 			// build action path
-			String httpMethod = servletRequest.getMethod().toUpperCase();
+			final String httpMethod = servletRequest.getMethod().toUpperCase();
 
 			if (log.isDebugEnabled()) {
 				log.debug("Action path: " + httpMethod + " " + actionPath);
@@ -105,21 +104,31 @@ public class MadvocController implements MadvocComponentLifecycle.Ready {
 
 			actionPath = actionPathRewriter.rewrite(servletRequest, actionPath, httpMethod);
 
-			final String[] actionPathChunks = MadvocUtil.splitPathToChunks(actionPath);
+			String[] actionPathChunks = MadvocUtil.splitPathToChunks(actionPath);
 
 			// resolve action runtime
 			ActionRuntime actionRuntime = actionsManager.lookup(httpMethod, actionPathChunks);
+
 			if (actionRuntime == null) {
-				return actionPath;
+
+				// special case!
+				if (actionPath.endsWith(welcomeFile)) {
+					actionPath = actionPath.substring(0, actionPath.length() - (welcomeFile.length() - 1));
+					actionPathChunks = MadvocUtil.splitPathToChunks(actionPath);
+					actionRuntime = actionsManager.lookup(httpMethod, actionPathChunks);
+				}
+				if (actionRuntime == null) {
+					return originalActionPath;
+				}
 			}
 			if (log.isDebugEnabled()) {
-				log.debug("Invoking action path '" + actionPath + "' using " + actionRuntime.createActionString());
+				log.debug("Invoke action for '" + actionPath + "' using " + actionRuntime.createActionString());
 			}
 
 			// set character encoding
-			if (!characterEncodingSet && madvocConfig.isApplyCharacterEncoding()) {
+			if (!characterEncodingSet && applyCharacterEncoding) {
 
-				String encoding = madvocConfig.getEncoding();
+				final String encoding = madvocEncoding.getEncoding();
 
 				if (encoding != null) {
 					servletRequest.setCharacterEncoding(encoding);
@@ -180,15 +189,17 @@ public class MadvocController implements MadvocComponentLifecycle.Ready {
 	 */
 	@SuppressWarnings("unchecked")
 	public void render(final ActionRequest actionRequest, final Object resultObject) throws Exception {
-		ActionResult actionResult = resultsManager.lookup(actionRequest, resultObject);
+		final ActionResult actionResult = resultsManager.lookup(actionRequest, resultObject);
 
 		if (actionResult == null) {
 			throw new MadvocException("Action result not found");
 		}
 
-		if (madvocConfig.isPreventCaching()) {
+		if (preventCaching) {
 			ServletUtil.preventCaching(actionRequest.getHttpServletResponse());
 		}
+
+		log.debug(() -> "Result type: " + actionResult.getClass().getSimpleName());
 
 		actionResult.render(actionRequest, actionRequest.getActionResult());
 	}

@@ -24,6 +24,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 package jodd.db.oom;
 
+import jodd.db.DbOom;
 import jodd.db.DbQuery;
 import jodd.db.DbSession;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class PreparedTest extends DbBaseTest {
 
 	class PostgreSql extends PostgreSqlDbAccess {
 		@Override
-		public String getCreateTableSql() {
+		public String createTableSql() {
 			return "create table TESTER (" +
 				"ID			SERIAL," +
 				"NAME		varchar(20)	NOT NULL," +
@@ -52,9 +53,7 @@ class PreparedTest extends DbBaseTest {
 	@Test
 	void testPreparedStatementDebugFalse() {
 		DbBaseTest.DbAccess db = new PreparedTest.PostgreSql();
-		init();
-		db.initDb();
-		connect();
+		init(db);
 
 		db.createTables();
 		try {
@@ -67,9 +66,7 @@ class PreparedTest extends DbBaseTest {
 	@Test
 	void testPrepredStatementDebugTrue() {
 		DbBaseTest.DbAccess db = new PreparedTest.PostgreSql();
-		init();
-		db.initDb();
-		connect();
+		init(db);
 
 		db.createTables();
 		try {
@@ -80,9 +77,9 @@ class PreparedTest extends DbBaseTest {
 	}
 
 	private void test(final boolean debug) {
-		DbSession session = new DbSession();
+		DbSession session = new DbSession(connectionPool);
 
-		DbQuery dbQuery = new DbQuery(session, "select * from TESTER where id=:id and name=:name");
+		DbQuery dbQuery = new DbQuery(DbOom.get(), session, "select * from TESTER where id=:id and name=:name");
 		dbQuery.setDebug(debug);
 
 		dbQuery.setInteger("id", 3);

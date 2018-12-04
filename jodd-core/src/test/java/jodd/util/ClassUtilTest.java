@@ -25,6 +25,9 @@
 
 package jodd.util;
 
+import jodd.Jodd;
+import jodd.buffer.FastByteBuffer;
+import jodd.chalk.Chalk;
 import jodd.test.DisabledOnJava;
 import jodd.util.fixtures.subclass.IBase;
 import jodd.util.fixtures.subclass.IExtra;
@@ -975,7 +978,15 @@ class ClassUtilTest {
 			assertNotNull(actual);
 			assertTrue(actual.getName().contains("rt.jar"));
 		}
+	}
 
+	@Test
+	void testSimpleClassName() {
+		assertEquals("j.Jodd", ClassUtil.getShortClassName(Jodd.class));
+		assertEquals("j.b.FastByteBuffer", ClassUtil.getShortClassName(FastByteBuffer.class));
+		assertEquals("j.buffer.FastByteBuffer", ClassUtil.getShortClassName(FastByteBuffer.class, 2));
+		assertEquals("jodd.buffer.FastByteBuffer", ClassUtil.getShortClassName(FastByteBuffer.class, 3));
+		assertEquals("jodd.buffer.FastByteBuffer", ClassUtil.getShortClassName(FastByteBuffer.class, 4));
 	}
 
 }

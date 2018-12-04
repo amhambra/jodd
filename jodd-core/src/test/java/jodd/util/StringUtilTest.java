@@ -27,11 +27,9 @@ package jodd.util;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 
 import static jodd.util.ArraysUtil.array;
@@ -802,34 +800,6 @@ class StringUtilTest {
 		assertEquals("3", StringUtil.toSafeString(Long.valueOf(3)));
 	}
 
-	@Test
-	void testToPrettyString() {
-		assertEquals(StringPool.NULL, StringUtil.toPrettyString(null));
-
-		assertEquals("[A,B]", StringUtil.toPrettyString(new String[]{"A", "B"}));
-		assertEquals("[1,2]", StringUtil.toPrettyString(new int[]{1,2}));
-		assertEquals("[1,2]", StringUtil.toPrettyString(new long[]{1,2}));
-		assertEquals("[1,2]", StringUtil.toPrettyString(new short[]{1,2}));
-		assertEquals("[1,2]", StringUtil.toPrettyString(new byte[]{1,2}));
-		assertEquals("[1.0,2.0]", StringUtil.toPrettyString(new double[]{1,2}));
-		assertEquals("[1.0,2.0]", StringUtil.toPrettyString(new float[]{1,2}));
-		assertEquals("[true,false]", StringUtil.toPrettyString(new boolean[] {true, false}));
-
-		try {
-			StringUtil.toPrettyString(new char[]{'a','b'});
-			fail("error");
-		} catch (IllegalArgumentException e) {
-			// ignore
-		}
-
-		assertEquals("[[1,2],[3,4]]", StringUtil.toPrettyString(new int[][] {{1, 2}, {3, 4}}));
-
-		List<Integer> list = new ArrayList<>();
-		list.add(1);
-		list.add(4);
-
-		assertEquals("{1,4}", StringUtil.toPrettyString(list));
-	}
 
 	@Test
 	void testCapitalize() {
@@ -1013,52 +983,6 @@ class StringUtilTest {
 		assertEquals("123", StringUtil.maxCommonPrefix("123456", "123"));
 	}
 
-	@Test
-	void testToCamelCase() {
-		assertEquals("oneTwoThree", StringUtil.toCamelCase("one two   three", false, ' '));
-		assertEquals("OneTwo.Three", StringUtil.toCamelCase("one two. three", true, ' '));
-		assertEquals("OneTwoThree", StringUtil.toCamelCase("One-two-three", true, '-'));
-
-		assertEquals("userName", StringUtil.toCamelCase("user_name", false, '_'));
-		assertEquals("UserName", StringUtil.toCamelCase("user_name", true, '_'));
-		assertEquals("user", StringUtil.toCamelCase("user", false, '_'));
-		assertEquals("User", StringUtil.toCamelCase("user", true, '_'));
-	}
-
-	@Test
-	void testFromCamelCase() {
-		assertEquals("one two three", StringUtil.fromCamelCase("oneTwoThree", ' '));
-		assertEquals("one-two-three", StringUtil.fromCamelCase("oneTwoThree", '-'));
-		assertEquals("one. two. three", StringUtil.fromCamelCase("one.Two.Three", ' '));
-
-		assertEquals("user_name", StringUtil.fromCamelCase("userName", '_'));
-		assertEquals("user_name", StringUtil.fromCamelCase("UserName", '_'));
-		assertEquals("user_name", StringUtil.fromCamelCase("USER_NAME", '_'));
-		assertEquals("user_name", StringUtil.fromCamelCase("user_name", '_'));
-		assertEquals("user", StringUtil.fromCamelCase("user", '_'));
-		assertEquals("user", StringUtil.fromCamelCase("User", '_'));
-		assertEquals("user", StringUtil.fromCamelCase("USER", '_'));
-		assertEquals("user", StringUtil.fromCamelCase("_user", '_'));
-		assertEquals("user", StringUtil.fromCamelCase("_User", '_'));
-		assertEquals("_user", StringUtil.fromCamelCase("__user", '_'));
-		assertEquals("user__name", StringUtil.fromCamelCase("user__name", '_'));
-	}
-
-	@Test
-	void testJavaEscapes() {
-		String from = "\r\t\b\f\n\\\"asd\u0111q\u0173aa\u0ABC\u0abc";
-		String to = "\\r\\t\\b\\f\\n\\\\\\\"asd\\u0111q\\u0173aa\\u0abc\\u0abc";
-
-		assertEquals(to, StringUtil.escapeJava(from));
-		assertEquals(from, StringUtil.unescapeJava(to));
-
-		try {
-			StringUtil.unescapeJava("\\r\\t\\b\\f\\q");
-			fail("error");
-		} catch (IllegalArgumentException e) {
-			// ignore
-		}
-	}
 
 	@Test
 	void testFindCommonPrefix() {
@@ -1120,47 +1044,6 @@ class StringUtilTest {
 		assertEquals("1234", StringUtil.stripToChar("1234", 'X'));
 	}
 
-
-	@Test
-	void testFormatPara() {
-		String txt = "123 567 90AB";
-		String p = StringUtil.formatParagraph(txt, 6, false);
-		assertEquals("123 56\n7 90AB\n", p);
-
-		p = StringUtil.formatParagraph(txt, 4, false);
-		assertEquals("123\n567\n90AB\n", p);
-
-		txt = "123  67 90AB";
-		p = StringUtil.formatParagraph(txt, 4, false);
-		assertEquals("123\n67\n90AB\n", p);
-
-		txt = "123 567 90AB";
-		p = StringUtil.formatParagraph(txt, 6, true);
-		assertEquals("123\n567\n90AB\n", p);
-
-		txt = "123  67 90AB";
-		p = StringUtil.formatParagraph(txt, 4, true);
-		assertEquals("123\n67\n90AB\n", p);
-		txt = "123  67 90ABCDE";
-		p = StringUtil.formatParagraph(txt, 4, true);
-		assertEquals("123\n67\n90AB\nCDE\n", p);
-
-		txt = "1234567";
-		p = StringUtil.formatParagraph(txt, 4, true);
-		assertEquals("1234\n567\n", p);
-		p = StringUtil.formatParagraph(txt, 4, false);
-		assertEquals("1234\n567\n", p);
-
-	}
-
-	@Test
-	void testTabsToSpaces() {
-		String s = StringUtil.convertTabsToSpaces("q\tqa\t", 3);
-		assertEquals("q  qa ", s);
-
-		s = StringUtil.convertTabsToSpaces("q\tqa\t", 0);
-		assertEquals("qqa", s);
-	}
 
 	@Test
 	void testContainsOnly() {
@@ -1264,5 +1147,23 @@ class StringUtilTest {
 	void testIfNotNull() {
 		assertEquals(StringPool.EMPTY, StringUtil.ifNotNull(null, str -> str + "It doesn't matter!"));
 		assertEquals("Jodd makes fun!", StringUtil.ifNotNull("Jodd", input -> input + " makes fun!"));
+	}
+
+	@Test
+	void testDetectQuoteChar() {
+		assertEquals(0, StringUtil.detectQuoteChar(""));
+		assertEquals(0, StringUtil.detectQuoteChar("d"));
+		assertEquals(0, StringUtil.detectQuoteChar("de"));
+		assertEquals(0, StringUtil.detectQuoteChar("der"));
+		assertEquals(0, StringUtil.detectQuoteChar("\"ded"));
+		assertEquals(0, StringUtil.detectQuoteChar("de\""));
+		assertEquals(0, StringUtil.detectQuoteChar("\""));
+
+		assertEquals('"', StringUtil.detectQuoteChar("\"\""));
+		assertEquals('"', StringUtil.detectQuoteChar("\"test\""));
+		assertEquals('\'', StringUtil.detectQuoteChar("''"));
+		assertEquals('\'', StringUtil.detectQuoteChar("'test'"));
+		assertEquals('`', StringUtil.detectQuoteChar("``"));
+		assertEquals('`', StringUtil.detectQuoteChar("`test`"));
 	}
 }

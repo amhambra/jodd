@@ -28,7 +28,6 @@ package jodd.mail;
 import com.sun.mail.pop3.POP3SSLStore;
 import jodd.util.StringPool;
 
-import javax.mail.Authenticator;
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.URLName;
@@ -39,21 +38,20 @@ import java.util.Properties;
  */
 public class Pop3SslServer extends Pop3Server {
 
-	protected static final String MAIL_POP3_SOCKET_FACTORY_PORT = "mail.pop3.socketFactory.port";
-	protected static final String MAIL_POP3_SOCKET_FACTORY_CLASS = "mail.pop3.socketFactory.class";
-	protected static final String MAIL_POP3_SOCKET_FACTORY_FALLBACK = "mail.pop3.socketFactory.fallback";
 	protected static final int DEFAULT_SSL_PORT = 995;
 
-	public Pop3SslServer(final String host, final int port, final Authenticator authenticator) {
-		super(host, port == -1 ? DEFAULT_SSL_PORT : port, authenticator);
+	public Pop3SslServer(final Builder builder) {
+		super(builder, DEFAULT_SSL_PORT);
 	}
 
 	@Override
 	protected Properties createSessionProperties() {
-		final Properties props = super.getSessionProperties();
-		props.setProperty(MAIL_POP3_SOCKET_FACTORY_PORT, String.valueOf(getPort()));
+		final Properties props = super.createSessionProperties();
+
+		props.setProperty(MAIL_POP3_SOCKET_FACTORY_PORT, String.valueOf(port));
 		props.setProperty(MAIL_POP3_SOCKET_FACTORY_CLASS, "javax.net.ssl.SSLSocketFactory");
 		props.setProperty(MAIL_POP3_SOCKET_FACTORY_FALLBACK, StringPool.FALSE);
+
 		return props;
 	}
 
@@ -65,13 +63,13 @@ public class Pop3SslServer extends Pop3Server {
 	 */
 	@Override
 	protected POP3SSLStore getStore(final Session session) {
-		final SimpleAuthenticator simpleAuthenticator = (SimpleAuthenticator) getAuthenticator();
+		final SimpleAuthenticator simpleAuthenticator = (SimpleAuthenticator) authenticator;
 		final URLName url;
 
 		if (simpleAuthenticator == null) {
 			url = new URLName(
 				PROTOCOL_POP3,
-				getHost(), getPort(),
+				host, port,
 				StringPool.EMPTY,
 				null, null);
 		}
@@ -79,7 +77,7 @@ public class Pop3SslServer extends Pop3Server {
 			final PasswordAuthentication pa = simpleAuthenticator.getPasswordAuthentication();
 			url = new URLName(
 				PROTOCOL_POP3,
-				getHost(), getPort(),
+				host, port,
 				StringPool.EMPTY,
 				pa.getUserName(), pa.getPassword());
 		}

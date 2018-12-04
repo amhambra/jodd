@@ -25,10 +25,14 @@
 
 package jodd.joy.action;
 
+import jodd.jtx.meta.ReadOnlyTransaction;
 import jodd.madvoc.meta.Action;
+import jodd.madvoc.meta.Auth;
 import jodd.madvoc.meta.In;
 import jodd.madvoc.meta.MadvocAction;
+import jodd.madvoc.meta.RestAction;
 import jodd.madvoc.result.JsonResult;
+import jodd.petite.meta.PetiteInject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -36,14 +40,27 @@ import java.util.Map;
 @MadvocAction
 public class HelloAction {
 
+	@PetiteInject
+	HelloBean helloBean;
+
+	@PetiteInject
+	HelloService helloService;
+
 	@In
-	private String username = "";
+	String username = "";
 
 	@Action
+	@ReadOnlyTransaction
 	public JsonResult execute() {
+		//helloService.appDao.count(HelloTable.class);
 		Map<String, Object> map = new HashMap<>();
 		map.put("username", username);
 		return JsonResult.of(map);
+	}
+
+	@Auth @RestAction
+	public JsonResult secret() {
+		return JsonResult.of("SECRET!");
 	}
 
 }

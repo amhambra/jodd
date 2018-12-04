@@ -25,8 +25,8 @@
 
 package jodd.util;
 
-import jodd.util.template.MapTemplateParser;
-import jodd.util.template.StringTemplateParser;
+import jodd.template.MapTemplateParser;
+import jodd.template.StringTemplateParser;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -186,6 +186,26 @@ class StringTemplateParserTest {
 
 		stp.setStrictFormat();
 		assertEquals("$inner.man bar", stp.of(map).parse("$inner.man ${foo}"));
+	}
+
+	@Test
+	void test601_IndexOutOfBounds() {
+		StringTemplateParser stp = new StringTemplateParser();
+		stp.setReplaceMissingKey(false);
+
+		assertEquals("$foo", stp.parse("$foo", null));
+		assertEquals("$foo bar", stp.parse("$foo bar", null));
+		assertEquals("foo $bar", stp.parse("foo $bar", null));
+		assertEquals("$foo", stp.parse("$foo", (s) -> {throw new RuntimeException();}));
+	}
+
+	@Test
+	void test601_DuplicatedChar() {
+		StringTemplateParser stp = new StringTemplateParser();
+		stp.setReplaceMissingKey(false);
+
+		assertEquals("bar$foo baz", stp.parse("bar$foo baz", null));
+		assertEquals("bar$foo baz", stp.parse("bar$foo baz", (s) -> {throw new RuntimeException();}));
 	}
 
 }

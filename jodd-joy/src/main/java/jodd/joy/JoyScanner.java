@@ -25,22 +25,21 @@
 
 package jodd.joy;
 
-import jodd.core.JavaBridge;
+import jodd.bridge.ClassPathURLs;
 import jodd.io.findfile.ClassScanner;
 import jodd.typeconverter.Converter;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Consumer;
 
 /**
- * <code>AppScanner</code> defines entries that will be included/excluded in
- * scanning process, when configuring Jodd frameworks.
- * By default, scanning entries includes all classes that belongs
- * to the project and to the Jodd.
+ * Tiny JoyScanner kickstart.
  */
-public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
+public class JoyScanner extends JoyBase implements JoyScannerConfig {
+
+	// ---------------------------------------------------------------- config
 
 	/**
 	 * Scanning entries that will be examined by various
@@ -54,6 +53,11 @@ public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
 	private List<String> includedJars = new ArrayList<>();
 
 	/**
+	 * Excluded jars.
+	 */
+	private List<String> excludedJars = new ArrayList<>();
+
+	/**
 	 * List of APP classes.
 	 */
 	private List<Class> appClasses = new ArrayList<>();
@@ -63,17 +67,30 @@ public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
 	 */
 	private boolean ignoreExceptions;
 
+	@Override
 	public JoyScanner setIncludedEntries(final String... includedEntries) {
+		requireNotStarted(classScanner);
 		Collections.addAll(this.includedEntries, includedEntries);
 		return this;
 	}
 
+	@Override
 	public JoyScanner setIncludedJars(final String... includedJars) {
+		requireNotStarted(classScanner);
 		Collections.addAll(this.includedJars, includedJars);
 		return this;
 	}
 
+	@Override
+	public JoyScanner setExcludedJars(final String... excludedJars) {
+		requireNotStarted(classScanner);
+		Collections.addAll(this.excludedJars, excludedJars);
+		return this;
+	}
+
+	@Override
 	public JoyScanner setIgnoreExceptions(final boolean ignoreExceptions) {
+		requireNotStarted(classScanner);
 		this.ignoreExceptions = ignoreExceptions;
 		return this;
 	}
@@ -84,7 +101,9 @@ public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
 	 * pass <i>any</i> user-application class, so Jodd can figure out the real
 	 * class path to scan.
 	 */
-	public JoyScanner scanClasspathOf(Class applicationClass) {
+	@Override
+	public JoyScanner scanClasspathOf(final Class applicationClass) {
+		requireNotStarted(classScanner);
 		appClasses.add(applicationClass);
 		return this;
 	}
@@ -92,25 +111,24 @@ public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
 	/**
 	 * Shortcut for {@link #scanClasspathOf(Class)}.
 	 */
-	public JoyScanner scanClasspathOf(Object applicationObject) {
+	@Override
+	public JoyScanner scanClasspathOf(final Object applicationObject) {
+		requireNotStarted(classScanner);
 		return scanClasspathOf(applicationObject.getClass());
 	}
 
+	// ---------------------------------------------------------------- runtime
 
-	// ---------------------------------------------------------------- start
-
-	@Override
-	public void start() {
-		initLogger();
-
-		log.info("SCANNER start ----------");
-
-		if (log.isDebugEnabled()) {
-			log.debug("Scan entries: " + Converter.get().toString(includedEntries));
-			log.debug("Scan jars: " + Converter.get().toString(includedJars));
-			log.debug("Scan ignore exception: " + ignoreExceptions);
-		}
+	/**
+	 * Returns class scanner.
+	 */
+	public ClassScanner getClassScanner() {
+		return requireStarted(classScanner);
 	}
+
+	// ---------------------------------------------------------------- lifecycle
+
+	protected ClassScanner classScanner;
 
 	/**
 	 * Configures scanner class finder. Works for all three scanners:
@@ -118,28 +136,61 @@ public class JoyScanner extends JoyBase implements Consumer<ClassScanner> {
 	 * but exclude all entries.
 	 */
 	@Override
-	public void accept(final ClassScanner classScanner) {
+	public void start() {
+		initLogger();
+
+		log.info("SCANNER start ----------");
+
+		classScanner = new ClassScanner() {
+			@Override
+			protected void scanJarFile(final File file) {
+				log.debug("Scanning jar: " + file);
+				super.scanJarFile(file);
+			}
+
+			@Override
+			protected void scanClassPath(final File root) {
+				log.debug("Scanning path: " + root);
+				super.scanClassPath(root);
+			}
+		};
+
+		if (log.isDebugEnabled()) {
+			log.debug("Scan entries: " + Converter.get().toString(includedEntries));
+			log.debug("Scan jars: " + Converter.get().toString(includedJars));
+			log.debug("Scan exclude jars: " + Converter.get().toString(excludedJars));
+			log.debug("Scan ignore exception: " + ignoreExceptions);
+		}
+
+		classScanner.excludeCommonEntries();
+		classScanner.excludeCommonJars();
+		classScanner.excludeJars(excludedJars.toArray(new String[0]));
+
 		if (includedEntries.isEmpty() && includedJars.isEmpty()) {
+			// nothing was explicitly included
 			classScanner.excludeAllEntries(false);
-			classScanner.excludeEntries("ch.qos.logback.*");
 		}
 		else {
+			// something was included by user
 			classScanner.excludeAllEntries(true);
 			includedEntries.add("jodd.*");
 		}
 
 		classScanner
-			.includeEntries(includedEntries.toArray(new String[includedEntries.size()]))
-			.includeJars(includedJars.toArray(new String[includedJars.size()]))
+			.detectEntriesMode(true)
+			.includeEntries(includedEntries.toArray(new String[0]))
+			.includeJars(includedJars.toArray(new String[0]))
 			.ignoreException(ignoreExceptions)
 			.scanDefaultClasspath();
 
-		appClasses.forEach(clazz -> classScanner.scan(JavaBridge.getURLs(clazz)));
+		appClasses.forEach(clazz -> classScanner.scan(ClassPathURLs.of(null, clazz)));
+
+		log.info("SCANNER OK!");
 	}
 
 	@Override
 	public void stop() {
-		includedEntries.clear();
-		includedJars.clear();
+		classScanner = null;
 	}
+
 }

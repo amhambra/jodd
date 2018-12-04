@@ -14,17 +14,19 @@ dependencies {
 	compile project(':jodd-log')
 	compile project(':jodd-lagarto')
 	compile project(':jodd-decora')
+	compile project(':jodd-http')
 
 	provided lib.servlet
 	provided lib.jsp
 
 	testCompile project(':jodd-http')
-	testCompile project(':jodd-db').sourceSets.test.output
+//	testCompile project(':jodd-db').sourceSets.test.output
 	testCompile lib.junit5
 	testCompile lib.junit5_params
 	testCompile lib.hsqldb
 	testCompile lib.tomcat_embed
 	testCompile lib.jetty_embed
 	testCompile lib.mockito
+	testCompile lib.mysql
 	testRuntime lib.servlet
 }

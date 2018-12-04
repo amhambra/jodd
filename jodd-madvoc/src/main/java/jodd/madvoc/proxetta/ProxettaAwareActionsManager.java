@@ -25,15 +25,14 @@
 
 package jodd.madvoc.proxetta;
 
+import jodd.cache.TypeCache;
 import jodd.madvoc.component.ActionsManager;
 import jodd.madvoc.config.ActionDefinition;
 import jodd.madvoc.config.ActionRuntime;
 import jodd.petite.meta.PetiteInject;
-import jodd.proxetta.impl.ProxyProxetta;
+import jodd.proxetta.Proxetta;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Madvoc {@link jodd.madvoc.component.ActionsManager actions manager} that works with Proxetta.
@@ -41,12 +40,12 @@ import java.util.Map;
 public class ProxettaAwareActionsManager extends ActionsManager {
 
 	@PetiteInject
-	protected ProxettaProvider proxettaProvider;
+	protected ProxettaSupplier proxettaSupplier;
 
-	protected final Map<Class, Class> proxyActionClasses;
+	protected final TypeCache<Class> proxyActionClasses;
 
 	public ProxettaAwareActionsManager() {
-		this.proxyActionClasses = new HashMap<>();
+		this.proxyActionClasses = TypeCache.createDefault();
 	}
 
 	/**
@@ -56,11 +55,9 @@ public class ProxettaAwareActionsManager extends ActionsManager {
 	 */
 	@Override
 	public synchronized ActionRuntime registerAction(Class actionClass, final Method actionMethod, ActionDefinition actionDefinition) {
-		if (proxettaProvider == null) {
+		if (proxettaSupplier == null) {
 			return super.registerAction(actionClass, actionMethod, actionDefinition);
 		}
-
-		final ProxyProxetta proxetta = proxettaProvider.get();
 
 		if (actionDefinition == null) {
 			actionDefinition = actionMethodParser.parseActionDefinition(actionClass, actionMethod);
@@ -71,6 +68,8 @@ public class ProxettaAwareActionsManager extends ActionsManager {
 		Class existing = proxyActionClasses.get(actionClass);
 
 		if (existing == null) {
+			final Proxetta proxetta = proxettaSupplier.get();
+
 			existing = proxetta.proxy().setTarget(actionClass).define();
 
 			proxyActionClasses.put(actionClass, existing);

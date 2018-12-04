@@ -25,7 +25,7 @@
 
 package jodd.proxetta.asm;
 
-import jodd.proxetta.JoddProxetta;
+import jodd.proxetta.ProxettaNames;
 
 import java.util.List;
 
@@ -41,7 +41,7 @@ final class TargetMethodData {
 	TargetMethodData(final MethodSignatureVisitor msign, final List<ProxyAspectData> aspectList) {
 		this.msign = msign;
 		this.methodName = msign.getMethodName();
-		this.proxyData = aspectList.toArray(new ProxyAspectData[aspectList.size()]);
+		this.proxyData = aspectList.toArray(new ProxyAspectData[0]);
 	}
 
 	// ---------------------------------------------------------------- current
@@ -62,7 +62,7 @@ final class TargetMethodData {
 	// ---------------------------------------------------------------- method names
 
 	private String methodName(final int index) {
-		return methodName + JoddProxetta.defaults().getMethodDivider() + proxyData[index].aspectIndex;
+		return methodName + ProxettaNames.methodDivider + proxyData[index].aspectIndex;
 	}
 
 	/**

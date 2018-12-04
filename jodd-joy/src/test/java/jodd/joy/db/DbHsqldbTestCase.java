@@ -25,6 +25,7 @@
 
 package jodd.joy.db;
 
+import jodd.db.DbOom;
 import jodd.db.DbQuery;
 import jodd.db.DbSession;
 import jodd.db.jtx.DbJtxTransactionManager;
@@ -38,7 +39,7 @@ public abstract class DbHsqldbTestCase {
 	protected CoreConnectionPool cp;
 
 	@BeforeEach
-	void setUp() throws Exception {
+	void setUp() {
 		cp = new CoreConnectionPool();
 		cp.setDriver("org.hsqldb.jdbcDriver");
 		cp.setUrl("jdbc:hsqldb:mem:test");
@@ -76,7 +77,7 @@ public abstract class DbHsqldbTestCase {
 	}
 
 	@AfterEach
-	void tearDown() throws Exception {
+	void tearDown() {
 		dbtxm.close();
 //		cp.close();
 		dbtxm = null;
@@ -85,15 +86,15 @@ public abstract class DbHsqldbTestCase {
 	// ---------------------------------------------------------------- helpers
 
 	protected int executeUpdate(DbSession session, String s) {
-		return new DbQuery(session, s).autoClose().executeUpdate();
+		return new DbQuery(DbOom.get(), session, s).autoClose().executeUpdate();
 	}
 
 	protected void executeUpdate(String sql) {
-		new DbQuery(sql).autoClose().executeUpdate();
+		new DbQuery(DbOom.get(), sql).autoClose().executeUpdate();
 	}
 
 	protected long executeCount(DbSession session, String s) {
-		return new DbQuery(session, s).autoClose().executeCount();
+		return new DbQuery(DbOom.get(), session, s).autoClose().executeCount();
 	}
 
 

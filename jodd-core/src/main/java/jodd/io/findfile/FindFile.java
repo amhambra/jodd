@@ -25,12 +25,12 @@
 
 package jodd.io.findfile;
 
+import jodd.inex.InExRules;
 import jodd.io.FileNameUtil;
 import jodd.io.FileUtil;
-import jodd.util.Consumers;
 import jodd.util.MultiComparator;
 import jodd.util.StringUtil;
-import jodd.util.inex.InExRules;
+import jodd.util.function.Consumers;
 
 import java.io.File;
 import java.net.URI;
@@ -56,13 +56,13 @@ import java.util.function.Consumer;
  */
 public class FindFile implements Iterable<File> {
 
-	public static WildcardFindFile wildcard() {
+	public static WildcardFindFile createWildcardFF() {
 		return new WildcardFindFile();
 	}
-	public static RegExpFindFile regexp() {
+	public static RegExpFindFile createRegExpFF() {
 		return new RegExpFindFile();
 	}
-	public static FindFile get() {
+	public static FindFile create() {
 		return new FindFile();
 	}
 
@@ -639,7 +639,7 @@ public class FindFile implements Iterable<File> {
 	 * Separates input files and folders.
 	 */
 	protected void init() {
-		rules.smartMode();
+		rules.detectMode();
 
 		todoFiles = new LinkedList<>();
 		todoFolders = new LinkedList<>();

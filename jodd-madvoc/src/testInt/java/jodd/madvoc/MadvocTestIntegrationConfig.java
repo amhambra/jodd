@@ -31,10 +31,11 @@ package jodd.madvoc;
 public class MadvocTestIntegrationConfig extends AutomagicMadvocConfigurator {
 
 	@Override
-	protected void onActionClass(String className) throws ClassNotFoundException {
+	protected void acceptActionClass(Class actionClass) {
+		String className = actionClass.getName();
 		if (!className.startsWith("jodd.madvoc.action.")) {
 			return;
 		}
-		super.onActionClass(className);
+		super.acceptActionClass(actionClass);
 	}
 }

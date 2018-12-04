@@ -25,9 +25,7 @@
 
 package jodd.db.querymap;
 
-import jodd.db.JoddDb;
 import jodd.props.Props;
-import jodd.props.PropsUtil;
 
 /**
  * {@link jodd.db.querymap.QueryMap} implementation based on
@@ -42,7 +40,7 @@ public class DbPropsQueryMap implements QueryMap {
 
 	public DbPropsQueryMap(final String... patterns) {
 		this.patterns = patterns;
-		loadQueriesFromClasspath();
+		reload();
 	}
 
 	public DbPropsQueryMap() {
@@ -56,8 +54,15 @@ public class DbPropsQueryMap implements QueryMap {
 		return props;
 	}
 
-	public void loadQueriesFromClasspath() {
-		props = PropsUtil.createFromClasspath(patterns);
+	@Override
+	public void reload() {
+		props = new Props();
+		props.loadFromClasspath(patterns);
+	}
+
+	@Override
+	public int size() {
+		return props.countTotalProperties();
 	}
 
 	// ---------------------------------------------------------------- sql
@@ -68,9 +73,6 @@ public class DbPropsQueryMap implements QueryMap {
 	 */
 	@Override
 	public String getQuery(final String key) {
-		if (JoddDb.defaults().isDebug()) {
-			loadQueriesFromClasspath();
-		}
 		return props.getValue(key);
 	}
 }

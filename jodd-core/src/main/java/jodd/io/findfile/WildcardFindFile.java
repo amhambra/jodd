@@ -25,8 +25,8 @@
 
 package jodd.io.findfile;
 
-import jodd.util.inex.InExRuleMatcher;
-import jodd.util.inex.InExRules;
+import jodd.inex.InExRuleMatcher;
+import jodd.inex.InExRules;
 
 /**
  * {@link FindFile} that matches file names using <code>*</code>, <code>?</code>
@@ -36,7 +36,7 @@ import jodd.util.inex.InExRules;
  */
 public class WildcardFindFile extends FindFile {
 
-	public static WildcardFindFile get() {
+	public static WildcardFindFile create() {
 		return new WildcardFindFile();
 	}
 

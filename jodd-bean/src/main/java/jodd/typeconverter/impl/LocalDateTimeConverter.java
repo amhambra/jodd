@@ -28,10 +28,12 @@ package jodd.typeconverter.impl;
 import jodd.typeconverter.TypeConversionException;
 import jodd.typeconverter.TypeConverter;
 import jodd.util.StringUtil;
-import jodd.util.TimeUtil;
+import jodd.time.TimeUtil;
 
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -42,6 +44,9 @@ public class LocalDateTimeConverter implements TypeConverter<LocalDateTime> {
 			return null;
 		}
 
+		if (value instanceof LocalDate) {
+			return LocalDateTime.of(((LocalDate) value), LocalTime.MIDNIGHT);
+		}
 		if (value instanceof Calendar) {
 			return TimeUtil.fromCalendar((Calendar) value);
 		}
@@ -53,6 +58,9 @@ public class LocalDateTimeConverter implements TypeConverter<LocalDateTime> {
 		}
 		if (value instanceof Number) {
 			return TimeUtil.fromMilliseconds(((Number)value).longValue());
+		}
+		if (value instanceof LocalTime) {
+			throw new TypeConversionException("Can't convert to date just from time: " + value);
 		}
 
 		String stringValue = value.toString().trim();

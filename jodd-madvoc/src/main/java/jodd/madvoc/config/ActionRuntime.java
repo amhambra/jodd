@@ -25,7 +25,6 @@
 
 package jodd.madvoc.config;
 
-import jodd.madvoc.ActionConfig;
 import jodd.madvoc.ActionHandler;
 import jodd.madvoc.filter.ActionFilter;
 import jodd.madvoc.interceptor.ActionInterceptor;
@@ -43,13 +42,15 @@ public class ActionRuntime {
 	private final Class actionClass;
 	private final Method actionClassMethod;
 	private final Class<? extends ActionResult> actionResult;
+	private final Class<? extends ActionResult> defaultActionResult;
 	private final String actionPath;
 	private final String actionMethod;
 	private final String resultBasePath;
 	private final boolean async;
+	private final boolean auth;
 
-	// scope data information matrix: [scope-type][target-index]
-	private final ScopeData[][] scopeData;
+	// scope data
+	private final ScopeData scopeData;
 	private final MethodParam[] methodParams;
 
 	private final boolean hasArguments;
@@ -58,39 +59,67 @@ public class ActionRuntime {
 	private RouteChunk routeChunk;
 	private final ActionFilter[] filters;
 	private final ActionInterceptor[] interceptors;
-	private final ActionConfig actionConfig;
 
 	public ActionRuntime(
-		final ActionHandler actionHandler,
-		final Class actionClass,
-		final Method actionClassMethod,
-		final ActionFilter[] filters,
-		final ActionInterceptor[] interceptors,
-		final ActionDefinition actionDefinition,
-		final Class<? extends ActionResult> actionResult,
-		final boolean async,
-		final ScopeData[][] scopeData,
-		final MethodParam[] methodParams,
-		final ActionConfig actionConfig
-			)
-	{
+			final ActionHandler actionHandler,
+			final Class actionClass,
+			final Method actionClassMethod,
+			final ActionFilter[] filters,
+			final ActionInterceptor[] interceptors,
+			final ActionDefinition actionDefinition,
+			final Class<? extends ActionResult> actionResult,
+			final Class<? extends ActionResult> defaultActionResult,
+			final boolean async,
+			final boolean auth,
+			final ScopeData scopeData,
+			final MethodParam[] methodParams
+	) {
 		this.actionHandler = actionHandler;
 		this.actionClass = actionClass;
 		this.actionClassMethod = actionClassMethod;
+//		this.actionClassMethod = methodOfDeclaredClass(actionClass, actionClassMethod);
 		this.actionPath = actionDefinition.actionPath();
 		this.actionMethod = actionDefinition.actionMethod() == null ? null : actionDefinition.actionMethod().toUpperCase();
 		this.resultBasePath = actionDefinition.resultBasePath();
 		this.hasArguments = actionClassMethod != null && (actionClassMethod.getParameterTypes().length != 0);
 		this.actionResult = actionResult;
+		this.defaultActionResult = defaultActionResult;
 		this.async = async;
+		this.auth = auth;
 
 		this.scopeData = scopeData;
 
 		this.filters = filters;
 		this.interceptors = interceptors;
 		this.methodParams = methodParams;
-		this.actionConfig = actionConfig;
 	}
+
+/*
+
+	/**
+	 * When wrapper proxy is used, the method will not belong to a type.
+	 * This method finds the corresponding method in the type.
+	private Method methodOfDeclaredClass(final Class type, final Method method) {
+		if (method.getDeclaringClass() == type) {
+			return method;
+		}
+
+		final Method[] allMethods = type.getDeclaredMethods();
+		for (final Method newMethod : allMethods) {
+			if (!newMethod.getName().equals(method.getName())) {
+				continue;
+			}
+			if (!newMethod.getReturnType().equals(method.getReturnType())) {
+				continue;
+			}
+			if (!Arrays.equals(newMethod.getParameterTypes(), method.getParameterTypes())) {
+				continue;
+			}
+			return newMethod;
+		}
+		return method;
+	}
+*/
 
 	// ---------------------------------------------------------------- getters
 
@@ -164,6 +193,10 @@ public class ActionRuntime {
 		return async;
 	}
 
+	public boolean isAuthenticated() {
+		return auth;
+	}
+
 	/**
 	 * Returns method parameters information, or <code>null</code> if method has no params.
 	 */
@@ -180,18 +213,24 @@ public class ActionRuntime {
 	}
 
 	/**
+	 * Returns default action result.
+	 */
+	public Class<? extends ActionResult> getDefaultActionResult() {
+		return defaultActionResult;
+	}
+
+	/**
 	 * Returns {@code true} if action has arguments.
 	 */
 	public boolean hasArguments() {
 		return hasArguments;
 	}
 
-	public ScopeData[][] getScopeData() {
+	/**
+	 * Returns scope data.
+	 */
+	public ScopeData getScopeData() {
 		return scopeData;
-	}
-
-	public ActionConfig getActionConfig() {
-		return actionConfig;
 	}
 
 	// ---------------------------------------------------------------- bind

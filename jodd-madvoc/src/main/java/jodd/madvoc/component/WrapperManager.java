@@ -25,12 +25,9 @@
 
 package jodd.madvoc.component;
 
-import jodd.madvoc.ActionConfig;
 import jodd.madvoc.ActionWrapper;
 import jodd.madvoc.BaseActionWrapperStack;
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocException;
-import jodd.madvoc.injector.Target;
 import jodd.petite.meta.PetiteInject;
 import jodd.util.ClassUtil;
 
@@ -50,9 +47,6 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 	@PetiteInject
 	protected ContextInjectorComponent contextInjectorComponent;
 
-	@PetiteInject
-	protected MadvocConfig madvocConfig;
-
 	protected WrapperManager() {
 		wrappers = new HashMap<>();
 	}
@@ -62,10 +56,10 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 	protected final Map<String, T> wrappers;
 
 	/**
-	 * Returns all action wrappers.
+	 * Returns all action wrappers. Returns a copy in new set.
 	 */
 	protected Set<T> getAll() {
-		Set<T> set = new HashSet<>(wrappers.size());
+		final Set<T> set = new HashSet<>(wrappers.size());
 		set.addAll(wrappers.values());
 		return set;
 	}
@@ -99,13 +93,13 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 
 	/**
 	 * Resolves wrappers. Unregistered wrappers will be registered. Returned array may be
-	 * different size than size of provided array, due to {@link #expand(ActionConfig, Class[]) expanding}.
+	 * different size than size of provided array, due to {@link #expand(Class[]) expanding}.
 	 */
-	public T[] resolveAll(final ActionConfig actionConfig, Class<? extends T>[] wrapperClasses) {
+	public T[] resolveAll(Class<? extends T>[] wrapperClasses) {
 		if (wrapperClasses == null) {
 			return null;
 		}
-		wrapperClasses = expand(actionConfig, wrapperClasses);
+		wrapperClasses = expand(wrapperClasses);
 		T[] result = createArray(wrapperClasses.length);
 
 		for (int i = 0; i < wrapperClasses.length; i++) {
@@ -125,7 +119,7 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 	 * Initializes action wrapper.
 	 */
 	protected void initializeWrapper(final T wrapper) {
-		contextInjectorComponent.injectContext(new Target(wrapper));
+		contextInjectorComponent.injectContext(wrapper);
 
 		wrapper.init();
 	}
@@ -133,20 +127,9 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 	// ---------------------------------------------------------------- expander
 
 	/**
-	 * Returns default wrappers from the configuration.
+	 * Replaces all {@link BaseActionWrapperStack} with stack values.
 	 */
-	protected abstract Class<? extends T>[] getDefaultWrappers(ActionConfig actionConfig);
-
-	/**
-	 * Returns marker wrapper class, shortcut for default web app wrappers.
-	 */
-	protected abstract Class<? extends T> getDefaultWebAppWrapper();
-
-	/**
-	 * Replaces all {@link #getDefaultWebAppWrapper()} with {@link #getDefaultWebAppWrapper()}
-	 * and {@link BaseActionWrapperStack} with stack values.
-	 */
-	protected Class<? extends T>[] expand(final ActionConfig actionConfig, final Class<? extends T>[] actionWrappers) {
+  protected Class<? extends T>[] expand(final Class<? extends T>[] actionWrappers) {
 		if (actionWrappers == null) {
 			return null;
 		}
@@ -157,23 +140,6 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 		while (i < list.size()) {
 			Class<? extends T> wrapperClass = list.get(i);
 			if (wrapperClass == null) {
-				continue;
-			}
-			if (wrapperClass.equals(getDefaultWebAppWrapper())) {
-				list.remove(i);
-				// add default wrappers list
-				Class<? extends T>[] defaultWrappers = getDefaultWrappers(actionConfig);
-				if (defaultWrappers != null) {
-					int ndx = i;
-					for (Class<? extends T> defaultWrapper : defaultWrappers) {
-						// can't add default list stack to default list
-						if (defaultWrapper.equals(getDefaultWebAppWrapper())) {
-							throw new MadvocException("Default wrapper list is self-contained (cyclic dependency)!");
-						}
-						list.add(ndx, defaultWrapper);
-						ndx++;
-					}
-				}
 				continue;
 			}
 			if (ClassUtil.isTypeOf(wrapperClass, BaseActionWrapperStack.class)) {
@@ -188,7 +154,7 @@ public abstract class WrapperManager<T extends ActionWrapper> {
 			}
 			i++;
 		}
-		return list.toArray(new Class[list.size()]);
+		return list.toArray(new Class[0]);
 	}
 
 	// ---------------------------------------------------------------- create

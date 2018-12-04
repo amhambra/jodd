@@ -25,8 +25,9 @@
 
 package jodd.petite;
 
-import jodd.bean.JoddBean;
+import jodd.cache.TypeCache;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.CtorDescriptor;
 import jodd.introspector.MethodDescriptor;
 import jodd.introspector.PropertyDescriptor;
@@ -78,7 +79,7 @@ public abstract class PetiteBeans {
 	/**
 	 * Map of all bean scopes.
 	 */
-	protected final Map<Class<? extends Scope>, Scope> scopes = new HashMap<>();
+	protected final TypeCache<Scope> scopes = TypeCache.createDefault();
 
 	/**
 	 * Map of all providers.
@@ -88,7 +89,22 @@ public abstract class PetiteBeans {
 	/**
 	 * Map of all bean collections.
 	 */
-	protected final Map<Class, String[]> beanCollections = new HashMap<>();
+	protected final TypeCache<String[]> beanCollections = TypeCache.createDefault();
+
+	/**
+	 * Cache used for storing the internals about the external types that are not
+	 * registered withing the container.
+	 */
+	protected TypeCache<BeanDefinition> externalsCache = TypeCache.<BeanDefinition>create().noCache().get();
+
+	/**
+	 * Sets the type of cache used for storing the configurations for external types that
+	 * are not part of the container. This affects usages of the methods
+	 * like {@link PetiteContainer#wire(Object)} and {@link PetiteContainer#invokeMethod(Object, Method)}.
+	 */
+	public void setExternalsCache(final TypeCache<BeanDefinition> typeCacheImplementation) {
+		this.externalsCache = typeCacheImplementation;
+	}
 
 	/**
 	 * {@link PetiteConfig Petite configuration}.
@@ -147,7 +163,7 @@ public abstract class PetiteBeans {
 		if (scope == null) {
 
 			try {
-				scope = PetiteUtil.newInstance(scopeType, (PetiteContainer) this);
+				scope = newInternalInstance(scopeType, (PetiteContainer) this);
 			} catch (Exception ex) {
 				throw new PetiteException("Invalid Petite scope: " + scopeType.getName(), ex);
 			}
@@ -157,6 +173,32 @@ public abstract class PetiteBeans {
 		}
 		return scope;
 	}
+
+
+	/**
+	 * Creates new instance of given type. In the first try, it tries to use
+	 * constructor with a {@link PetiteContainer}. If that files, uses default
+	 * constructor to builds an instance.
+	 */
+	private <T> T newInternalInstance(final Class<T> type, final PetiteContainer petiteContainer) throws Exception {
+		T t = null;
+
+		// first try ctor(PetiteContainer)
+		try {
+			Constructor<T> ctor = type.getConstructor(PetiteContainer.class);
+			t = ctor.newInstance(petiteContainer);
+		} catch (NoSuchMethodException nsmex) {
+			// ignore
+		}
+
+		// if first try failed, try default ctor
+		if (t == null) {
+			return ClassUtil.newInstance(type);
+		}
+
+		return t;
+	}
+
 
 	/**
 	 * Registers new scope. It is not necessary to manually register scopes,
@@ -242,9 +284,24 @@ public abstract class PetiteBeans {
 	 * By default returns new instance of {@link jodd.petite.BeanDefinition}.
 	 */
 	protected <T> BeanDefinition createBeanDefinitionForRegistration(
-		final String name, final Class<T> type, final Scope scope, final WiringMode wiringMode, final Consumer<T> consumer) {
+			final String name,
+			final Class<T> type,
+			final Scope scope,
+			final WiringMode wiringMode,
+			final Consumer<T> consumer) {
 
 		return new BeanDefinition<>(name, type, scope, wiringMode, consumer);
+	}
+
+	/**
+	 * Creates {@link jodd.petite.BeanDefinition} for all external beans.
+	 */
+	protected <T> BeanDefinition createBeandDefinitionForExternalBeans(
+			final Class<T> type,
+			final WiringMode wiringMode) {
+
+		final String name = resolveBeanName(type);
+		return new BeanDefinition<>(name, type, null, wiringMode, null);
 	}
 
 	/**
@@ -323,7 +380,7 @@ public abstract class PetiteBeans {
 		registerBean(name, beanDefinition);
 
 		// providers
-		ProviderDefinition[] providerDefinitions = petiteResolvers.resolveProviderDefinitions(beanDefinition);
+		ProviderDefinition[] providerDefinitions = petiteResolvers.resolveProviderDefinitions(type, name);
 
 		if (providerDefinitions != null) {
 			for (ProviderDefinition providerDefinition : providerDefinitions) {
@@ -448,7 +505,7 @@ public abstract class PetiteBeans {
 		if (list.isEmpty()) {
 			beanNames = StringPool.EMPTY_ARRAY;
 		} else {
-			beanNames = list.toArray(new String[list.size()]);
+			beanNames = list.toArray(new String[0]);
 		}
 
 		beanCollections.put(type, beanNames);
@@ -467,7 +524,7 @@ public abstract class PetiteBeans {
 	public void registerPetiteCtorInjectionPoint(final String beanName, final Class[] paramTypes, final String[] references) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 		Constructor constructor = null;
 
 		if (paramTypes == null) {
@@ -505,7 +562,7 @@ public abstract class PetiteBeans {
 	public void registerPetitePropertyInjectionPoint(final String beanName, final String property, final String reference) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 		PropertyDescriptor propertyDescriptor = cd.getPropertyDescriptor(property, true);
 
 		if (propertyDescriptor == null) {
@@ -527,7 +584,7 @@ public abstract class PetiteBeans {
 	 */
 	public void registerPetiteSetInjectionPoint(final String beanName, final String property) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 
 		PropertyDescriptor propertyDescriptor = cd.getPropertyDescriptor(property, true);
 
@@ -551,7 +608,7 @@ public abstract class PetiteBeans {
 	public void registerPetiteMethodInjectionPoint(final String beanName, final String methodName, final Class[] arguments, final String[] references) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 
 		Method method = null;
 		if (arguments == null) {
@@ -590,7 +647,7 @@ public abstract class PetiteBeans {
 	public void registerPetiteInitMethods(final String beanName, final InitMethodInvocationStrategy invocationStrategy, String... initMethodNames) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 		if (initMethodNames == null) {
 			initMethodNames = StringPool.EMPTY_ARRAY;
 		}
@@ -619,7 +676,7 @@ public abstract class PetiteBeans {
 	public void registerPetiteDestroyMethods(final String beanName, String... destroyMethodNames) {
 		BeanDefinition beanDefinition = lookupExistingBeanDefinition(beanName);
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanDefinition.type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanDefinition.type);
 		if (destroyMethodNames == null) {
 			destroyMethodNames = StringPool.EMPTY_ARRAY;
 		}
@@ -658,7 +715,7 @@ public abstract class PetiteBeans {
 
 		Class beanType = beanDefinition.type;
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(beanType);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(beanType);
 		MethodDescriptor md = cd.getMethodDescriptor(methodName, arguments, true);
 
 		if (md == null) {
@@ -679,7 +736,7 @@ public abstract class PetiteBeans {
 	 * @param arguments method argument types
 	 */
 	public void registerPetiteProvider(final String providerName, final Class type, final String staticMethodName, final Class[] arguments) {
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(type);
 		MethodDescriptor md = cd.getMethodDescriptor(staticMethodName, arguments, true);
 
 		if (md == null) {

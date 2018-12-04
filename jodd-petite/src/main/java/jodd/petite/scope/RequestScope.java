@@ -27,6 +27,7 @@ package jodd.petite.scope;
 
 import jodd.petite.BeanData;
 import jodd.petite.BeanDefinition;
+import jodd.petite.PetiteContainer;
 import jodd.petite.PetiteException;
 import jodd.servlet.RequestContextListener;
 
@@ -38,6 +39,12 @@ import java.util.Map;
  * Request scope.
  */
 public class RequestScope implements Scope {
+
+	private final PetiteContainer pc;
+
+	public RequestScope(final PetiteContainer pc) {
+		this.pc = pc;
+	}
 
 	/**
 	 * Since request map is stored in the requests, app server may want to
@@ -103,7 +110,7 @@ public class RequestScope implements Scope {
 		if (beanData == null) {
 			return null;
 		}
-		return beanData.instance();
+		return beanData.bean();
 	}
 
 	@Override
@@ -114,8 +121,7 @@ public class RequestScope implements Scope {
 			map = createRequestMap(servletRequest);
 		}
 
-		BeanData beanData = new BeanData(beanDefinition, bean);
-		map.put(beanDefinition.name(), new TransientBeanData(beanData));
+		map.put(beanDefinition.name(), new TransientBeanData(new BeanData(pc, beanDefinition, bean)));
 	}
 
 	@Override

@@ -27,10 +27,6 @@ package jodd.madvoc.result;
 
 import jodd.io.StreamUtil;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.MadvocConfig;
-import jodd.madvoc.ScopeType;
-import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
 import jodd.servlet.ServletUtil;
 
 import javax.servlet.http.HttpServletResponse;
@@ -44,9 +40,6 @@ import java.io.OutputStream;
  * and new values should be set here. Output is closed after writing.
  */
 public class RawActionResult implements ActionResult<RawData> {
-
-	@In @Scope(ScopeType.CONTEXT)
-	protected MadvocConfig madvocConfig;
 
 	@Override
 	public void render(final ActionRequest actionRequest, final RawData resultValue) throws IOException {

@@ -26,21 +26,37 @@
 package jodd.introspector;
 
 
+import java.util.Objects;
+
 /**
  * Default class {@link ClassIntrospector} simply delegates method calls for
  * more convenient usage.
  */
 public interface ClassIntrospector {
 
+	class Implementation {
+		private static ClassIntrospector classIntrospector = new CachingIntrospector();
+
+		/**
+		 * Sets default implementation.
+		 */
+		public static void set(final ClassIntrospector classIntrospector) {
+			Objects.requireNonNull(classIntrospector);
+			Implementation.classIntrospector = classIntrospector;
+		}
+	}
+
+	/**
+	 * Returns default implementation.
+	 */
+	static ClassIntrospector get() {
+		return Implementation.classIntrospector;
+	}
+
 	/**
 	 * Returns class descriptor for specified type.
 	 */
 	ClassDescriptor lookup(Class type);
-
-	/**
-	 * Registers new type.
-	 */
-	ClassDescriptor register(Class type);
 
 	/**
 	 * Clears all cached data.

@@ -28,24 +28,24 @@ package jodd.proxetta.asm;
 import jodd.asm.AnnotationVisitorAdapter;
 import jodd.asm.AsmUtil;
 import jodd.asm.EmptyClassVisitor;
-import jodd.asm6.AnnotationVisitor;
-import jodd.asm6.Attribute;
-import jodd.asm6.ClassReader;
-import jodd.asm6.ClassVisitor;
-import jodd.asm6.FieldVisitor;
-import jodd.asm6.MethodVisitor;
-import jodd.proxetta.JoddProxetta;
+import jodd.asm7.AnnotationVisitor;
+import jodd.asm7.Attribute;
+import jodd.asm7.ClassReader;
+import jodd.asm7.ClassVisitor;
+import jodd.asm7.FieldVisitor;
+import jodd.asm7.MethodVisitor;
 import jodd.proxetta.ProxettaException;
+import jodd.proxetta.ProxettaNames;
 import jodd.proxetta.ProxyAspect;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static jodd.asm6.Opcodes.ACC_ABSTRACT;
-import static jodd.asm6.Opcodes.ALOAD;
-import static jodd.asm6.Opcodes.INVOKESPECIAL;
-import static jodd.asm6.Opcodes.INVOKESTATIC;
-import static jodd.asm6.Opcodes.RETURN;
+import static jodd.asm7.Opcodes.ACC_ABSTRACT;
+import static jodd.asm7.Opcodes.ALOAD;
+import static jodd.asm7.Opcodes.INVOKESPECIAL;
+import static jodd.asm7.Opcodes.INVOKESTATIC;
+import static jodd.asm7.Opcodes.RETURN;
 import static jodd.proxetta.asm.ProxettaAsmUtil.CLINIT;
 import static jodd.proxetta.asm.ProxettaAsmUtil.DESC_VOID;
 import static jodd.proxetta.asm.ProxettaAsmUtil.INIT;
@@ -100,7 +100,8 @@ public class ProxettaClassBuilder extends EmptyClassVisitor {
 		access &= ~AsmUtil.ACC_ABSTRACT;
 
 		// write destination class
-		wd.dest.visit(version, access, wd.thisReference, signature, wd.superName, null);
+		final int v = ProxettaAsmUtil.resolveJavaVersion(version);
+		wd.dest.visit(v, access, wd.thisReference, signature, wd.superName, null);
 
 		wd.proxyAspects = new ProxyAspectData[aspects.length];
 		for (int i = 0; i < aspects.length; i++) {
@@ -119,8 +120,11 @@ public class ProxettaClassBuilder extends EmptyClassVisitor {
 	 */
 	@Override
 	public MethodVisitor visitMethod(final int access, final String name, final String desc, final String signature, final String[] exceptions) {
-		MethodSignatureVisitor msign = targetClassInfo.lookupMethodSignatureVisitor(access, name, desc, wd.superReference);
+		final MethodSignatureVisitor msign = targetClassInfo.lookupMethodSignatureVisitor(access, name, desc, wd.superReference);
 		if (msign == null) {
+			return null;
+		}
+		if (msign.isFinal && !wd.allowFinalMethods) {
 			return null;
 		}
 
@@ -199,7 +203,7 @@ public class ProxettaClassBuilder extends EmptyClassVisitor {
 	 * This created init method is called from each destination's constructor.
 	 */
 	protected void makeProxyConstructor() {
-		MethodVisitor mv = wd.dest.visitMethod(AsmUtil.ACC_PRIVATE | AsmUtil.ACC_FINAL, JoddProxetta.defaults().getInitMethodName(), DESC_VOID, null, null);
+		MethodVisitor mv = wd.dest.visitMethod(AsmUtil.ACC_PRIVATE | AsmUtil.ACC_FINAL, ProxettaNames.initMethodName, DESC_VOID, null, null);
 		mv.visitCode();
 		if (wd.adviceInits != null) {
 			for (String name : wd.adviceInits) {
@@ -220,6 +224,7 @@ public class ProxettaClassBuilder extends EmptyClassVisitor {
 	 * Checks for all public super methods that are not overridden.
 	 */
 	protected void processSuperMethods() {
+
 		for (ClassReader cr : targetClassInfo.superClassReaders) {
 			cr.accept(new EmptyClassVisitor() {
 

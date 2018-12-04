@@ -26,14 +26,16 @@
 package jodd.joy;
 
 import jodd.props.Props;
-import jodd.props.PropsUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
-public class JoyProps extends JoyBase {
+/**
+ * Tiny Joy Props kickstarter.
+ */
+public class JoyProps extends JoyBase implements JoyPropsConfig {
 	protected final Supplier<String> nameSupplier;
 
 	protected Props props;
@@ -42,13 +44,13 @@ public class JoyProps extends JoyBase {
 		this.nameSupplier = nameSupplier;
 	}
 
-	// ---------------------------------------------------------------- getters
+	// ---------------------------------------------------------------- runtime
 
 	/**
 	 * Returns application Props.
 	 */
 	public Props getProps() {
-		return props;
+		return requireStarted(props);
 	}
 
 	// ---------------------------------------------------------------- config
@@ -59,12 +61,16 @@ public class JoyProps extends JoyBase {
 	/**
 	 * Adds props files or patterns.
 	 */
+	@Override
 	public JoyProps addPropsFile(final String namePattern) {
+		requireNotStarted(props);
 		this.propsNamePatterns.add(namePattern);
 		return this;
 	}
 
+	@Override
 	public JoyProps addPropsProfiles(final String... profiles) {
+		requireNotStarted(props);
 		Collections.addAll(propsProfiles, profiles);
 		return this;
 	}
@@ -81,7 +87,7 @@ public class JoyProps extends JoyBase {
 	 * If props have been already loaded, does nothing.
 	 */
 	@Override
-	void start() {
+	public void start() {
 		initLogger();
 
 		log.info("PROPS start ----------");
@@ -91,9 +97,9 @@ public class JoyProps extends JoyBase {
 		props.loadSystemProperties("sys");
 		props.loadEnvironment("env");
 
-		log.info("Loaded sys&env props: " + props.countTotalProperties() + " properties.");
+		log.debug("Loaded sys&env props: " + props.countTotalProperties() + " properties.");
 
-		props.setActiveProfiles(propsProfiles.toArray(new String[propsProfiles.size()]));
+		props.setActiveProfiles(propsProfiles.toArray(new String[0]));
 
 		// prepare patterns
 
@@ -107,9 +113,15 @@ public class JoyProps extends JoyBase {
 
 		log.debug("Loading props from classpath...");
 
-		PropsUtil.loadFromClasspath(props, patterns);
+		final long startTime = System.currentTimeMillis();
 
-		log.info("Props is ready: " + props.countTotalProperties() + " properties.");
+		props.loadFromClasspath(patterns);
+
+		log.debug("Props scanning completed in " + (System.currentTimeMillis() - startTime) + "ms.");
+
+		log.debug("Total properties: " + props.countTotalProperties());
+
+		log.info("PROPS OK!");
 	}
 
 	/**
@@ -125,7 +137,7 @@ public class JoyProps extends JoyBase {
 	}
 
 	@Override
-	void stop() {
+	public void stop() {
 		props = null;
 	}
 }

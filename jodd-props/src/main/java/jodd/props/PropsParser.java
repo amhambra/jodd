@@ -208,6 +208,13 @@ public class PropsParser implements Cloneable {
 
 					// start section
 					case '[':
+						if (sb.length() > 0) {
+							if (StringUtil.isNotBlank(sb)) {
+								sb.append(c);
+								// previous string is not blank, hence it's not the section
+								break;
+							}
+						}
 						sb.setLength(0);
 						insideSection = true;
 						break;
@@ -443,7 +450,7 @@ public class PropsParser implements Cloneable {
 
 			String[] profiles = null;
 			if (keyProfiles != null) {
-				profiles = keyProfiles.toArray(new String[keyProfiles.size()]);
+				profiles = keyProfiles.toArray(new String[0]);
 			}
 
 			String[] sources = StringUtil.splitc(value, ',');

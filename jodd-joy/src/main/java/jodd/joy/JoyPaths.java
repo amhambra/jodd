@@ -25,9 +25,9 @@
 
 package jodd.joy;
 
+import jodd.system.SystemUtil;
 import jodd.util.ClassLoaderUtil;
 import jodd.util.StringUtil;
-import jodd.util.SystemUtil;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -36,17 +36,21 @@ import static jodd.joy.JoddJoy.APP_DIR;
 
 public class JoyPaths extends JoyBase {
 
-	private String appDir;
+	protected String appDir;
+
+	// ---------------------------------------------------------------- runtime
 
 	/**
 	 * Returns resolved app dir.
 	 */
 	public String getAppDir() {
-		return appDir;
+		return requireStarted(appDir);
 	}
 
+	// ---------------------------------------------------------------- lifecycle
+
 	@Override
-	void start() {
+	public void start() {
 		initLogger();
 
 		final String resourceName = StringUtil.replaceChar(JoyPaths.class.getName(), '.', '/') + ".class";
@@ -69,7 +73,7 @@ public class JoyPaths extends JoyBase {
 
 		final int ndx = appDir.indexOf("WEB-INF");
 
-		appDir = (ndx > 0) ? appDir.substring(0, ndx) : SystemUtil.workingFolder();
+		appDir = (ndx > 0) ? appDir.substring(0, ndx) : SystemUtil.info().getWorkingDir();
 
 		System.setProperty(APP_DIR, appDir);
 
@@ -77,6 +81,6 @@ public class JoyPaths extends JoyBase {
 	}
 
 	@Override
-	void stop() {
+	public void stop() {
 	}
 }

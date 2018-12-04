@@ -28,17 +28,17 @@ package jodd.madvoc;
 import jodd.log.LoggerFactory;
 import jodd.log.impl.SimpleLogger;
 import jodd.madvoc.action.HelloAction;
+import jodd.madvoc.component.RootPackages;
 import jodd.madvoc.petite.PetiteWebApp;
+import jodd.petite.AutomagicPetiteConfigurator;
+import jodd.petite.PetiteContainer;
 
 public class MyWebApplication extends PetiteWebApp {
 
 	public MyWebApplication() {
+		super(new PetiteContainer());
 		LoggerFactory.setLoggerProvider(SimpleLogger.PROVIDER);
-	}
-
-	@Override
-	protected void configureMadvoc(MadvocConfig madvocConfig) {
-		madvocConfig.getRootPackages().addRootPackageOf(HelloAction.class);
+		new AutomagicPetiteConfigurator(petiteContainer).configure();
 	}
 
 	@Override
@@ -51,6 +51,8 @@ public class MyWebApplication extends PetiteWebApp {
 
 	@Override
 	protected void initialized() {
+		withRegisteredComponent(RootPackages.class, rp -> rp.addRootPackageOf(HelloAction.class));
+
 		router(madvoc -> {
 			madvoc
 				.get("/batman")

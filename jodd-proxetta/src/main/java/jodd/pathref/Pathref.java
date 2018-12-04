@@ -25,6 +25,7 @@
 
 package jodd.pathref;
 
+import jodd.cache.TypeCache;
 import jodd.proxetta.ProxettaUtil;
 import jodd.util.ClassUtil;
 import jodd.util.StringPool;
@@ -34,8 +35,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 /**
  * Super tool for getting calling path reference in compile-time.
@@ -45,8 +44,9 @@ public class Pathref<C> {
 
 	public static final int ALL = -1;
 
+	public static TypeCache<Class> cache = TypeCache.createDefault();
+
 	private static final PathrefProxetta proxetta = new PathrefProxetta();
-	private static final Map<Class, Class> cache = new WeakHashMap<>();
 
 	private final C instance;
 
@@ -80,7 +80,7 @@ public class Pathref<C> {
 	 * Creates proxy object.
 	 */
 	protected C createProxyObject(Class<C> target) {
-		target = ProxettaUtil.getTargetClass(target);
+		target = ProxettaUtil.resolveTargetClass(target);
 
 		Class proxyClass = cache.get(target);
 

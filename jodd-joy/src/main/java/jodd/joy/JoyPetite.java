@@ -25,58 +25,76 @@
 
 package jodd.joy;
 
+import jodd.cache.TypeCache;
+import jodd.chalk.Chalk256;
 import jodd.petite.AutomagicPetiteConfigurator;
+import jodd.petite.BeanDefinition;
 import jodd.petite.PetiteContainer;
 import jodd.petite.proxetta.ProxettaAwarePetiteContainer;
 import jodd.petite.scope.SessionScope;
 import jodd.petite.scope.SingletonScope;
-import jodd.props.Props;
-import jodd.proxetta.impl.ProxyProxetta;
-import jodd.util.Consumers;
+import jodd.util.ClassUtil;
+import jodd.util.StringUtil;
+import jodd.util.function.Consumers;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import static jodd.joy.JoddJoy.PETITE_CORE;
-import static jodd.joy.JoddJoy.PETITE_SCAN;
+public class JoyPetite extends JoyBase implements JoyPetiteConfig {
 
-public class JoyPetite extends JoyBase {
-
+	protected final Supplier<String> appNameSupplier;
 	protected final Supplier<JoyScanner> joyScannerSupplier;
-	protected final Supplier<Props> propsSupplier;
-	protected final Supplier<ProxyProxetta> proxettaSupplier;
+	protected final Supplier<JoyProps> joyPropsSupplier;
+	protected final Supplier<JoyProxetta> joyProxettaSupplier;
 
 	protected PetiteContainer petiteContainer;
-	protected boolean isWebApplication = true;  // todo add this value as well!
+	protected boolean isWebApplication = true;
 
 	public JoyPetite(
-		final Supplier<ProxyProxetta> proxettaSupplier,
-		final Supplier<Props> propsSupplier, final Supplier<JoyScanner> joyScannerSupplier) {
-		this.proxettaSupplier = proxettaSupplier;
+			final Supplier<String> appNameSupplier,
+			final Supplier<JoyProxetta> joyProxettaSupplier,
+			final Supplier<JoyProps> joyPropsSupplier,
+			final Supplier<JoyScanner> joyScannerSupplier) {
+		this.appNameSupplier = appNameSupplier;
+		this.joyProxettaSupplier = joyProxettaSupplier;
 		this.joyScannerSupplier = joyScannerSupplier;
-		this.propsSupplier = propsSupplier;
+		this.joyPropsSupplier = joyPropsSupplier;
 	}
 
-	// ---------------------------------------------------------------- getters
+	// ---------------------------------------------------------------- runtime
 
 	/**
 	 * Returns PetiteContainer once when it is created.
 	 */
 	public PetiteContainer getPetiteContainer() {
-		return petiteContainer;
+		return requireStarted(petiteContainer);
 	}
 
 	// ---------------------------------------------------------------- config
 
 	private boolean autoConfiguration = true;
+	private boolean externalsCache = true;
 	private Consumers<PetiteContainer> petiteContainerConsumers = Consumers.empty();
 
+	@Override
 	public JoyPetite disableAutoConfiguration() {
+		requireNotStarted(petiteContainer);
 		autoConfiguration = false;
 		return this;
 	}
 
+	@Override
+	public JoyPetite disableExternalsCache() {
+		requireNotStarted(petiteContainer);
+		externalsCache = true;
+		return this;
+	}
+
+	@Override
 	public JoyPetite withPetite(final Consumer<PetiteContainer> petiteContainerConsumer) {
+		requireNotStarted(petiteContainer);
 		petiteContainerConsumers.add(petiteContainerConsumer);
 		return this;
 	}
@@ -86,71 +104,110 @@ public class JoyPetite extends JoyBase {
 	/**
 	 * Creates and initializes Petite container.
 	 * It will be auto-magically configured by scanning the classpath.
-	 * Also, all 'app*.prop*' will be loaded and values will
-	 * be injected in the matched beans. At the end it registers
-	 * this instance of core into the container.
 	 */
 	@Override
-	void start() {
+	public void start() {
 		initLogger();
 
 		log.info("PETITE start  ----------");
 
 		petiteContainer = createPetiteContainer();
 
-		log.info("app in web: " + isWebApplication);
+		if (externalsCache) {
+			petiteContainer.setExternalsCache(TypeCache.createDefault());
+		}
+
+		log.info("Web application? " + isWebApplication);
 
 		if (!isWebApplication) {
 			// make session scope to act as singleton scope
 			// if this is not a web application (and http session is not available).
-			petiteContainer.registerScope(SessionScope.class, new SingletonScope());
+			petiteContainer.registerScope(SessionScope.class, new SingletonScope(petiteContainer));
 		}
 
 		// load parameters from properties files
-		petiteContainer.defineParameters(propsSupplier.get());
-
-		petiteContainer.addBean(PETITE_SCAN, joyScannerSupplier.get());
+		petiteContainer.defineParameters(joyPropsSupplier.get().getProps());
 
 		// automagic configuration
 		if (autoConfiguration) {
-			log.info("*PETITE Automagic scanning");
+			final AutomagicPetiteConfigurator automagicPetiteConfigurator =
+				new AutomagicPetiteConfigurator(petiteContainer);
 
-			registerPetiteContainerBeans(petiteContainer);
+			automagicPetiteConfigurator.registerAsConsumer(joyScannerSupplier.get().getClassScanner());
 		}
 
-		log.debug("Petite manual configuration started...");
 		petiteContainerConsumers.accept(this.petiteContainer);
 
-		// add AppCore instance to Petite
-		petiteContainer.addBean(PETITE_CORE, petiteContainer);
+		log.info("PETITE OK!");
 	}
 
 	protected ProxettaAwarePetiteContainer createPetiteContainer() {
-		return new ProxettaAwarePetiteContainer(proxettaSupplier.get());
-	}
-
-	/**
-	 * Configures Petite container. By default scans the class path
-	 * for petite beans and registers them automagically.
-	 */
-	protected void registerPetiteContainerBeans(final PetiteContainer petiteContainer) {
-		final AutomagicPetiteConfigurator pcfg = new AutomagicPetiteConfigurator();
-
-		pcfg.withScanner(classScanner -> joyScannerSupplier.get().accept(classScanner));
-
-		pcfg.configure(petiteContainer);
+		return new ProxettaAwarePetiteContainer(joyProxettaSupplier.get().getProxetta());
 	}
 
 	/**
 	 * Stops Petite container.
 	 */
 	@Override
-	void stop() {
+	public void stop() {
 		if (log != null) {
 			log.info("PETITE stop");
 		}
 		if (petiteContainer != null) {
 			petiteContainer.shutdown();
 		}
+		petiteContainer = null;
+	}
+
+	// ---------------------------------------------------------------- print
+
+	public void printBeans(final int width) {
+		final Print print = new Print();
+
+		print.line("Beans", width);
+
+		final List<BeanDefinition> beanDefinitionList = new ArrayList<>();
+		final String appName = appNameSupplier.get();
+		final String prefix = appName + ".";
+
+		petiteContainer.forEachBean(beanDefinitionList::add);
+
+		beanDefinitionList.stream()
+			.sorted((bd1, bd2) -> {
+				if (bd1.name().startsWith(prefix)) {
+					if (bd2.name().startsWith(prefix)) {
+						return bd1.name().compareTo(bd2.name());
+					}
+					return 1;
+				}
+				if (bd2.name().startsWith(prefix)) {
+					if (bd1.name().startsWith(prefix)) {
+						return bd1.name().compareTo(bd2.name());
+					}
+					return -1;
+				}
+				return bd1.name().compareTo(bd2.name());
+			})
+			.forEach(beanDefinition -> {
+				print.out(Chalk256.chalk().yellow(), scopeName(beanDefinition), 10);
+				print.space();
+
+
+				print.outLeftRightNewLine(
+					Chalk256.chalk().green(), beanDefinition.name(),
+					Chalk256.chalk().blue(), ClassUtil.getShortClassName(beanDefinition.type(), 2),
+					width - 10 - 1
+				);
+			});
+
+		print.line(width);
+	}
+
+	private String scopeName(final BeanDefinition beanDefinition) {
+		String scopeName = beanDefinition.scope().getSimpleName();
+
+		scopeName = StringUtil.cutSuffix(scopeName, "Scope");
+
+		return scopeName.toLowerCase();
 	}
 }

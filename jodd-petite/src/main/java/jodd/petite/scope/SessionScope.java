@@ -27,6 +27,7 @@ package jodd.petite.scope;
 
 import jodd.petite.BeanData;
 import jodd.petite.BeanDefinition;
+import jodd.petite.PetiteContainer;
 import jodd.petite.PetiteException;
 import jodd.servlet.RequestContextListener;
 
@@ -45,6 +46,13 @@ import java.util.Map;
  * the request and the session.
  */
 public class SessionScope extends ShutdownAwareScope {
+
+	private final PetiteContainer pc;
+
+	public SessionScope(final PetiteContainer pc) {
+		this.pc = pc;
+	}
+
 
 	// ---------------------------------------------------------------- destory
 
@@ -125,7 +133,7 @@ public class SessionScope extends ShutdownAwareScope {
 		if (beanData == null) {
 			return null;
 		}
-		return beanData.instance();
+		return beanData.bean();
 	}
 
 	@Override
@@ -136,7 +144,8 @@ public class SessionScope extends ShutdownAwareScope {
 			map = registerSessionBeans(session);
 		}
 
-		BeanData beanData = new BeanData(beanDefinition, bean);
+		final BeanData beanData = new BeanData(pc, beanDefinition, bean);
+
 		map.put(beanDefinition.name(), beanData);
 
 		registerDestroyableBeans(beanData);

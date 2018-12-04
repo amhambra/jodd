@@ -25,23 +25,23 @@
 
 package jodd.json;
 
-import jodd.bean.JoddBean;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.PropertyDescriptor;
 import jodd.json.meta.JsonAnnotationManager;
+import jodd.json.meta.TypeData;
 import jodd.util.CharArraySequence;
 import jodd.util.CharUtil;
 import jodd.util.StringPool;
 import jodd.util.UnsafeUtil;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-
-import static jodd.json.JoddJson.DEFAULT_CLASS_METADATA_NAME;
 
 /**
  * Simple, developer-friendly JSON parser. It focuses on easy usage
@@ -59,8 +59,33 @@ import static jodd.json.JoddJson.DEFAULT_CLASS_METADATA_NAME;
  */
 public class JsonParser extends JsonParserBase {
 
-	private boolean lazy;
-	private boolean notFirstObject = false;
+	public static class Defaults {
+
+		public static final String DEFAULT_CLASS_METADATA_NAME = "__class";
+
+		/**
+		 * Flag for enabling the lazy mode.
+		 */
+		public static boolean lazy = false;
+		/**
+		 * Defines if parser will use extended paths information
+		 * and path matching.
+		 */
+		public static boolean useAltPathsByParser = false;
+		/**
+		 * Default value for loose mode.
+		 */
+		public static boolean loose = false;
+
+		/**
+		 * Specifies if 'class' metadata is used and its value. When set, class metadata
+		 * is used by {@link jodd.json.JsonSerializer} and all objects
+		 * will have additional field with the class type in the resulting JSON.
+		 * {@link jodd.json.JsonParser} will also consider this flag to build
+		 * correct object type. If <code>null</code>, class information is not used.
+		 */
+		public static String classMetadataName = null;
+	}
 
 	/**
 	 * Static ctor.
@@ -93,13 +118,18 @@ public class JsonParser extends JsonParserBase {
 	protected char[] input;
 	protected int total;
 	protected Path path;
-	protected boolean useAltPaths = JoddJson.defaults().isUseAltPathsByParser();
+	protected boolean useAltPaths = Defaults.useAltPathsByParser;
+	protected boolean lazy = Defaults.lazy;
+	protected boolean looseMode = Defaults.loose;
 	protected Class rootType;
 	protected MapToBean mapToBean;
-	protected boolean looseMode;
+	private boolean notFirstObject = false;
+
+	private final JsonAnnotationManager jsonAnnotationManager;
 
 	public JsonParser() {
-		text = new char[512];
+		this.text = new char[512];
+		this.jsonAnnotationManager = JsonAnnotationManager.get();
 	}
 
 	/**
@@ -245,19 +275,32 @@ public class JsonParser extends JsonParserBase {
 
 	// ---------------------------------------------------------------- class meta data name
 
-	protected String classMetadataName = JoddJson.defaults().getClassMetadataName();
+	protected String classMetadataName = Defaults.classMetadataName;
 
 	/**
 	 * Sets local class meta-data name.
+	 * <p>
+	 * Note that by using the class meta-data name you may expose a security hole in case untrusted source
+	 * manages to specify a class that is accessible through class loader and exposes set of methods and/or fields,
+	 * access of which opens an actual security hole. Such classes are known as “deserialization gadget”s.
+	 *
+	 * Because of this, use of "default typing" is not encouraged in general, and in particular is recommended against
+	 * if the source of content is not trusted. Conversely, default typing may be used for processing content in
+	 * cases where both ends (sender and receiver) are controlled by same entity.
 	 */
 	public JsonParser setClassMetadataName(final String name) {
 		classMetadataName = name;
 		return this;
 	}
 
+	/**
+	 * Sets usage of default class meta-data name.
+	 * Using it may introduce a security hole, see {@link #setClassMetadataName(String)} for more details.
+	 * @see #setClassMetadataName(String)
+	 */
 	public JsonParser withClassMetadata(final boolean useMetadata) {
 		if (useMetadata) {
-			classMetadataName = DEFAULT_CLASS_METADATA_NAME;
+			classMetadataName = Defaults.DEFAULT_CLASS_METADATA_NAME;
 		}
 		else {
 			classMetadataName = null;
@@ -265,6 +308,26 @@ public class JsonParser extends JsonParserBase {
 		return this;
 	}
 
+	/**
+	 * Adds a {@link jodd.util.Wildcard wildcard} pattern for white-listing classes.
+	 * @see #setClassMetadataName(String)
+	 */
+	public JsonParser allowClass(final String classPattern) {
+		if (super.classnameWhitelist == null) {
+			super.classnameWhitelist = new ArrayList<>();
+		}
+		classnameWhitelist.add(classPattern);
+		return this;
+	}
+
+	/**
+	 * Removes the whitelist of allowed classes.
+	 * @see #setClassMetadataName(String)
+	 */
+	public JsonParser allowAllClasses() {
+		classnameWhitelist = null;
+		return this;
+	}
 
 	// ---------------------------------------------------------------- parse
 
@@ -389,7 +452,7 @@ public class JsonParser extends JsonParserBase {
 	protected Object parseValue(final Class targetType, final Class keyType, final Class componentType) {
 		final ValueConverter valueConverter;
 
-		char c = input[ndx];
+		final char c = input[ndx];
 
 		switch (c) {
 			case '\'':
@@ -544,7 +607,7 @@ public class JsonParser extends JsonParserBase {
 			final char c = input[ndx];
 
 			if (insideString) {
-				if (c == '\"') {
+				if (c == '\"' && (ndx == 0 || input[ndx - 1] != '\\')) {
 					insideString = false;
 				}
 			}
@@ -804,7 +867,7 @@ public class JsonParser extends JsonParserBase {
 				// if string is 19 chars and longer, it can be over the limit
 				BigInteger bigInteger = new BigInteger(value);
 
-				if (isGreaterThenLong(bigInteger)) {
+				if (isGreaterThanLong(bigInteger)) {
 					return bigInteger;
 				}
 				longNumber = bigInteger.longValue();
@@ -820,7 +883,7 @@ public class JsonParser extends JsonParserBase {
 		return Long.valueOf(longNumber);
 	}
 
-	private static boolean isGreaterThenLong(final BigInteger bigInteger) {
+	private static boolean isGreaterThanLong(final BigInteger bigInteger) {
 		if (bigInteger.compareTo(MAX_LONG) > 0) {
 			return true;
 		}
@@ -922,10 +985,10 @@ public class JsonParser extends JsonParserBase {
 		boolean isTargetTypeMap = true;
 		boolean isTargetRealTypeMap = true;
 		ClassDescriptor targetTypeClassDescriptor = null;
-		JsonAnnotationManager.TypeData typeData = null;
+		TypeData typeData = null;
 
 		if (targetType != null) {
-			targetTypeClassDescriptor = JoddBean.defaults().getClassIntrospector().lookup(targetType);
+			targetTypeClassDescriptor = ClassIntrospector.get().lookup(targetType);
 
 			// find if the target is really a map
 			// because when classMetadataName != null we are forcing
@@ -933,7 +996,7 @@ public class JsonParser extends JsonParserBase {
 
 			isTargetRealTypeMap = targetTypeClassDescriptor.isMap();
 
-			typeData = JsonAnnotationManager.get().lookupTypeData(targetType);
+			typeData = jsonAnnotationManager.lookupTypeData(targetType);
 		}
 
 		if (isTargetRealTypeMap) {
@@ -992,7 +1055,7 @@ public class JsonParser extends JsonParserBase {
 
 			if (!isTargetRealTypeMap) {
 				// replace key with real property value
-				key = JsonAnnotationManager.get().resolveRealName(targetType, key);
+				key = jsonAnnotationManager.resolveRealName(targetType, key);
 			}
 
 			if (!isTargetTypeMap) {

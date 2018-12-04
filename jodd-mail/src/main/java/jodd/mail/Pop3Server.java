@@ -29,6 +29,7 @@ import javax.mail.Authenticator;
 import javax.mail.NoSuchProviderException;
 import javax.mail.Session;
 import javax.mail.Store;
+import java.io.File;
 import java.util.Properties;
 
 import static jodd.util.StringPool.TRUE;
@@ -38,10 +39,6 @@ import static jodd.util.StringPool.TRUE;
  */
 public class Pop3Server extends MailServer<ReceiveMailSession> {
 
-	protected static final String MAIL_POP3_PORT = "mail.pop3.port";
-	protected static final String MAIL_POP3_HOST = "mail.pop3.host";
-	protected static final String MAIL_POP3_AUTH = "mail.pop3.auth";
-
 	protected static final String PROTOCOL_POP3 = "pop3";
 
 	/**
@@ -49,18 +46,30 @@ public class Pop3Server extends MailServer<ReceiveMailSession> {
 	 */
 	protected static final int DEFAULT_POP3_PORT = 110;
 
-	public Pop3Server(final String host, final int port, final Authenticator authenticator) {
-		super(host, port == -1 ? DEFAULT_POP3_PORT : port, authenticator);
+	public Pop3Server(final Builder builder) {
+		super(builder, DEFAULT_POP3_PORT);
+	}
+	protected Pop3Server(final Builder builder, final int defaultPort) {
+		super(builder, defaultPort);
 	}
 
 	@Override
 	protected Properties createSessionProperties() {
-		final Properties props = new Properties();
-		props.setProperty(MAIL_POP3_HOST, getHost());
-		props.setProperty(MAIL_POP3_PORT, String.valueOf(getPort()));
-		if (getAuthenticator() != null) {
+		final Properties props = super.createSessionProperties();
+
+		props.setProperty(MAIL_POP3_HOST, host);
+		props.setProperty(MAIL_POP3_PORT, String.valueOf(port));
+
+		if (authenticator != null) {
 			props.setProperty(MAIL_POP3_AUTH, TRUE);
 		}
+
+		if (timeout > 0) {
+			final String timeoutValue = String.valueOf(timeout);
+			props.put(MAIL_POP3_CONNECTIONTIMEOUT, timeoutValue);
+			props.put(MAIL_POP3_TIMEOUT, timeoutValue);
+		}
+
 		return props;
 	}
 
@@ -78,11 +87,15 @@ public class Pop3Server extends MailServer<ReceiveMailSession> {
 	 * {@inheritDoc}
 	 *
 	 * @return {@link ReceiveMailSession}
-	 * @see EmailUtil#createSession(String, Properties, Authenticator)
+	 * @see EmailUtil#createSession(String, Properties, Authenticator, File)
 	 */
 	@Override
 	public ReceiveMailSession createSession() {
-		return EmailUtil.createSession(PROTOCOL_POP3, getSessionProperties(), getAuthenticator());
+		return EmailUtil.createSession(
+			PROTOCOL_POP3,
+			createSessionProperties(),
+			authenticator,
+			attachmentStorage);
 	}
 
 }

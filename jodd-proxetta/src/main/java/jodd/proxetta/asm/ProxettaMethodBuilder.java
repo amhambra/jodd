@@ -29,27 +29,27 @@ import jodd.asm.AnnotationVisitorAdapter;
 import jodd.asm.AsmUtil;
 import jodd.asm.EmptyClassVisitor;
 import jodd.asm.EmptyMethodVisitor;
-import jodd.asm6.AnnotationVisitor;
-import jodd.asm6.MethodVisitor;
-import jodd.proxetta.JoddProxetta;
+import jodd.asm7.AnnotationVisitor;
+import jodd.asm7.MethodVisitor;
 import jodd.proxetta.ProxettaException;
+import jodd.proxetta.ProxettaNames;
 import jodd.proxetta.ProxyTarget;
 import jodd.proxetta.ProxyTargetReplacement;
 
 import java.util.List;
 
-import static jodd.asm6.Opcodes.ACC_ABSTRACT;
-import static jodd.asm6.Opcodes.ACC_NATIVE;
-import static jodd.asm6.Opcodes.ALOAD;
-import static jodd.asm6.Opcodes.ARETURN;
-import static jodd.asm6.Opcodes.ASTORE;
-import static jodd.asm6.Opcodes.GETFIELD;
-import static jodd.asm6.Opcodes.INVOKEINTERFACE;
-import static jodd.asm6.Opcodes.INVOKESPECIAL;
-import static jodd.asm6.Opcodes.INVOKESTATIC;
-import static jodd.asm6.Opcodes.INVOKEVIRTUAL;
-import static jodd.asm6.Opcodes.POP;
-import static jodd.asm6.Opcodes.POP2;
+import static jodd.asm7.Opcodes.ACC_ABSTRACT;
+import static jodd.asm7.Opcodes.ACC_NATIVE;
+import static jodd.asm7.Opcodes.ALOAD;
+import static jodd.asm7.Opcodes.ARETURN;
+import static jodd.asm7.Opcodes.ASTORE;
+import static jodd.asm7.Opcodes.GETFIELD;
+import static jodd.asm7.Opcodes.INVOKEINTERFACE;
+import static jodd.asm7.Opcodes.INVOKESPECIAL;
+import static jodd.asm7.Opcodes.INVOKESTATIC;
+import static jodd.asm7.Opcodes.INVOKEVIRTUAL;
+import static jodd.asm7.Opcodes.POP;
+import static jodd.asm7.Opcodes.POP2;
 import static jodd.proxetta.asm.ProxettaAsmUtil.adviceFieldName;
 import static jodd.proxetta.asm.ProxettaAsmUtil.adviceMethodName;
 import static jodd.proxetta.asm.ProxettaAsmUtil.castToReturnType;
@@ -142,8 +142,11 @@ public class ProxettaMethodBuilder extends EmptyMethodVisitor {
 	protected void createFirstChainDelegate_Start() {
 		// check invalid access flags
 		int access = msign.getAccessFlags();
-		if ((access & AsmUtil.ACC_FINAL) != 0) {   // detect final
-			throw new ProxettaException("Unable to create proxy for final method: " + msign +". Remove final modifier or change the pointcut definition.");
+		if (!wd.allowFinalMethods) {
+			if ((access & AsmUtil.ACC_FINAL) != 0) {   // detect final
+				throw new ProxettaException(
+					"Unable to create proxy for final method: " + msign + ". Remove final modifier or change the pointcut definition.");
+			}
 		}
 
 		// create proxy methods
@@ -213,7 +216,7 @@ public class ProxettaMethodBuilder extends EmptyMethodVisitor {
 			@Override
 			public MethodVisitor visitMethod(final int access, final String name, final String desc, final String signature, final String[] exceptions) {
 
-				if (!name.equals(JoddProxetta.defaults().getExecuteMethodName())) {
+				if (!name.equals(ProxettaNames.executeMethodName)) {
 					return null;
 				}
 

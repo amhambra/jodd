@@ -142,7 +142,7 @@ public class BeanDefinition<T> {
 	/**
 	 * Returns init method points.
 	 */
-	public InitMethodPoint[] InitMethodPoints() {
+	public InitMethodPoint[] initMethodPoints() {
 		return initMethods;
 	}
 
@@ -173,7 +173,8 @@ public class BeanDefinition<T> {
 	}
 
 	/**
-	 * Delegates to {@link jodd.petite.scope.Scope#register(jodd.petite.BeanDefinition, Object)}.
+	 * Delegates to {@link jodd.petite.scope.Scope#register(jodd.petite.BeanDefinition, Object)}
+	 * if scope is defined.
 	 */
 	protected void scopeRegister(final Object object) {
 		if (scope != null) {
@@ -255,7 +256,7 @@ public class BeanDefinition<T> {
 		return "BeanDefinition{" +
 				"name=" + name +
 				", type=" + type +
-				", scope=" + scope.getClass().getSimpleName() +
+				", scope=" + (scope != null ? scope.getClass().getSimpleName() : "N/A") +
 				", wiring=" + wiringMode +
 				'}';
 	}

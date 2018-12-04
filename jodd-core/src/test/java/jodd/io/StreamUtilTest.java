@@ -26,9 +26,9 @@
 package jodd.io;
 
 import jodd.core.JoddCore;
+import jodd.system.SystemUtil;
 import jodd.util.ArraysUtil;
 import jodd.util.MathUtil;
-import jodd.util.SystemUtil;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -71,7 +71,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class StreamUtilTest {
 
-    static final File BASE_DIR = new File(SystemUtil.tempDir(), "jodd/StreamUtilTest");
+    static final File BASE_DIR = new File(SystemUtil.info().getTempDir(), "jodd/StreamUtilTest");
 
     @BeforeAll
     static void beforeAll() throws Exception {
@@ -602,7 +602,7 @@ class StreamUtilTest {
 
         Stream<Arguments> testdata_testCopy_Inputstream_Outputstream_ByteCount() throws Exception {
             return Stream.of(
-                    Arguments.of("The Unbearable Lightness of Java", "The Unbearable Lightness of Java", JoddCore.defaults().getIoBufferSize() + 250),
+                    Arguments.of("The Unbearable Lightness of Java", "The Unbearable Lightness of Java", JoddCore.ioBufferSize + 250),
                     Arguments.of("j", "jodd" , 1),
                     Arguments.of("jodd makes fun!", "jodd makes fun!",  15),
                     Arguments.of("", "text does not matter",  0)

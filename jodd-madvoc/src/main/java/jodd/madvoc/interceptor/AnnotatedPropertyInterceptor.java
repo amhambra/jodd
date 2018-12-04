@@ -25,16 +25,15 @@
 
 package jodd.madvoc.interceptor;
 
-import jodd.bean.JoddBean;
+import jodd.cache.TypeCache;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.PropertyDescriptor;
 import jodd.madvoc.ActionRequest;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Performs some operation on all annotated properties. Helpful with injection of
@@ -69,7 +68,7 @@ public abstract class AnnotatedPropertyInterceptor implements ActionInterceptor 
 
 	// ---------------------------------------------------------------- cache and lookup
 
-	protected Map<Class<?>, PropertyDescriptor[]> annotatedProperties = new HashMap<>();
+	protected TypeCache<PropertyDescriptor[]> annotatedProperties = TypeCache.createDefault();
 	protected static final PropertyDescriptor[] EMPTY = new PropertyDescriptor[0];
 
 	/**
@@ -83,7 +82,7 @@ public abstract class AnnotatedPropertyInterceptor implements ActionInterceptor 
 			return properties;
 		}
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(type);
 		PropertyDescriptor[] allProperties = cd.getAllPropertyDescriptors();
 
 		List<PropertyDescriptor> list = new ArrayList<>();
@@ -110,7 +109,7 @@ public abstract class AnnotatedPropertyInterceptor implements ActionInterceptor 
 		if (list.isEmpty()) {
 			properties = EMPTY;
 		} else {
-			properties = list.toArray(new PropertyDescriptor[list.size()]);
+			properties = list.toArray(new PropertyDescriptor[0]);
 		}
 
 		annotatedProperties.put(type, properties);

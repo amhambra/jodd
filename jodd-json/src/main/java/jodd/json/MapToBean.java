@@ -25,12 +25,14 @@
 
 package jodd.json;
 
-import jodd.bean.JoddBean;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.PropertyDescriptor;
 import jodd.introspector.Setter;
+import jodd.typeconverter.TypeConverterManager;
 import jodd.util.ClassLoaderUtil;
 import jodd.util.ClassUtil;
+import jodd.util.Wildcard;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
@@ -68,6 +70,8 @@ public class MapToBean {
 			}
 		}
 		else {
+			checkClassName(jsonParser.classnameWhitelist, className);
+
 			try {
 				targetType = ClassLoaderUtil.loadClass(className);
 			} catch (ClassNotFoundException cnfex) {
@@ -79,7 +83,7 @@ public class MapToBean {
 			target = jsonParser.newObjectInstance(targetType);
 		}
 
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(target.getClass());
+		ClassDescriptor cd = ClassIntrospector.get().lookup(target.getClass());
 
 		boolean targetIsMap = target instanceof Map;
 
@@ -142,6 +146,17 @@ public class MapToBean {
 		}
 
 		return target;
+	}
+
+	private void checkClassName(final List<String> classnameWhitelist, final String className) {
+		if (classnameWhitelist == null) {
+			return;
+		}
+		classnameWhitelist.forEach(pattern -> {
+			if (!Wildcard.equalsOrMatch(className, pattern)) {
+				throw new JsonException("Class can't be loaded as it is not whitelisted: " + className);
+			}
+		});
 	}
 
 	/**
@@ -231,7 +246,7 @@ public class MapToBean {
 		}
 
 		try {
-			return JoddBean.defaults().getTypeConverterManager().convertType(value, targetType);
+			return TypeConverterManager.get().convertType(value, targetType);
 		}
 		catch (Exception ex) {
 			throw new JsonException("Type conversion failed", ex);

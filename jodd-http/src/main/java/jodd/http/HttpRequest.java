@@ -25,11 +25,12 @@
 
 package jodd.http;
 
+import jodd.net.HttpMethod;
+import jodd.net.MimeTypes;
 import jodd.util.Base64;
 import jodd.util.StringBand;
 import jodd.util.StringPool;
 import jodd.util.StringUtil;
-import jodd.util.net.HttpMethod;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,6 +39,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import static jodd.util.StringPool.CRLF;
 import static jodd.util.StringPool.SPACE;
@@ -47,11 +51,9 @@ import static jodd.util.StringPool.SPACE;
  */
 public class HttpRequest extends HttpBase<HttpRequest> {
 
-	private static final int DEFAULT_PORT = -1;
-
 	protected String protocol = "http";
 	protected String host = "localhost";
-	protected int port = DEFAULT_PORT;
+	protected int port = Defaults.DEFAULT_PORT;
 	protected String method = "GET";
 	protected String path = StringPool.SLASH;
 	protected HttpMultiMap<String> query;
@@ -108,7 +110,7 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 	 * current protocol.
 	 */
 	public int port() {
-		if (port == DEFAULT_PORT) {
+		if (port == Defaults.DEFAULT_PORT) {
 			if (protocol == null) {
 				return 80;
 			}
@@ -180,7 +182,7 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 			ndx = host.indexOf(':');
 
 			if (ndx == -1) {
-				port = DEFAULT_PORT;
+				port = Defaults.DEFAULT_PORT;
 			} else {
 				port = Integer.parseInt(host.substring(ndx + 1));
 				host = host.substring(0, ndx);
@@ -476,11 +478,10 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 
 	// ---------------------------------------------------------------- query encoding
 
-	protected String queryEncoding = JoddHttp.defaults().getQueryEncoding();
+	protected String queryEncoding = Defaults.queryEncoding;
 
 	/**
-	 * Defines encoding for query parameters. Default value is
-	 * copied from {@link JoddHttp#queryEncoding}.
+	 * Defines encoding for query parameters.
 	 */
 	public HttpRequest queryEncoding(final String encoding) {
 		this.queryEncoding = encoding;
@@ -528,7 +529,7 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 			url.append(host);
 		}
 
-		if (port != DEFAULT_PORT) {
+		if (port != Defaults.DEFAULT_PORT) {
 			url.append(':');
 			url.append(port);
 		}
@@ -542,17 +543,27 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 	 * Enables basic authentication by adding required header.
 	 */
 	public HttpRequest basicAuthentication(final String username, final String password) {
-
 		if (username != null && password != null) {
 			String data = username.concat(StringPool.COLON).concat(password);
 
 			String base64 = Base64.encodeToString(data);
 
-			headerOverwrite("Authorization", "Basic " + base64);
+			headerOverwrite(HEADER_AUTHORIZATION, "Basic " + base64);
 		}
 
 		return this;
 	}
+
+	/**
+	 * Enables token-based authentication.
+	 */
+	public HttpRequest tokenAuthentication(final String token) {
+		if (token != null) {
+			headerOverwrite(HEADER_AUTHORIZATION, "Bearer " + token);
+		}
+		return this;
+	}
+
 
 	// ---------------------------------------------------------------- https
 
@@ -597,7 +608,7 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 	public HttpRequest setHostHeader() {
 		String hostPort = this.host;
 
-		if (port != DEFAULT_PORT) {
+		if (port != Defaults.DEFAULT_PORT) {
 			hostPort += StringPool.COLON + port;
 		}
 
@@ -718,12 +729,12 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 
 	/**
 	 * Opens a new {@link HttpConnection connection} using either
-	 * provided or {@link JoddHttp#httpConnectionProvider default} connection
+	 * provided or {@link HttpConnectionProvider default} connection
 	 * provider.
 	 */
 	public HttpRequest open() {
 		if (httpConnectionProvider == null) {
-			return open(JoddHttp.defaults().getHttpConnectionProvider());
+			return open(HttpConnectionProvider.get());
 		}
 
 		return open(httpConnectionProvider);
@@ -901,7 +912,7 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 		// user-agent
 
 		if (header("User-Agent") == null) {
-			header("User-Agent", JoddHttp.defaults().getUserAgent());
+			header("User-Agent", Defaults.userAgent);
 		}
 
 		// POST method requires Content-Type to be set
@@ -951,9 +962,10 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 			return null;
 		}
 
-		HttpRequest httpRequest = new HttpRequest();
+		final HttpRequest httpRequest = new HttpRequest();
+		httpRequest.headers.clear();
 
-		String line;
+		final String line;
 		try {
 			line = reader.readLine();
 		} catch (IOException ioex) {
@@ -972,6 +984,49 @@ public class HttpRequest extends HttpBase<HttpRequest> {
 		}
 
 		return httpRequest;
+	}
+
+
+	// ---------------------------------------------------------------- shortcuts
+
+	/**
+	 * Specifies JSON content type.
+	 */
+	public HttpRequest contentTypeJson() {
+		return contentType(MimeTypes.MIME_APPLICATION_JSON);
+	}
+
+	/**
+	 * Accepts JSON content type.
+	 */
+	public HttpRequest acceptJson() {
+		return accept(MimeTypes.MIME_APPLICATION_JSON);
+	}
+
+
+	// ---------------------------------------------------------------- functional/async
+
+	/**
+	 * Sends http request asynchronously using common fork-join pool.
+	 * Note that this is not the right non-blocking call (not a NIO), it is just
+	 * a regular call that is operated in a separate thread.
+	 */
+	public CompletableFuture<HttpResponse> sendAsync() {
+		return CompletableFuture.supplyAsync(this::send);
+	}
+
+	/**
+	 * Syntax sugar.
+	 */
+	public <R> R sendAndReceive(final Function<HttpResponse, R> responseHandler) {
+		return responseHandler.apply(send());
+	}
+
+	/**
+	 * Syntax sugar.
+	 */
+	public void sendAndReceive(final Consumer<HttpResponse> responseHandler) {
+		responseHandler.accept(send());
 	}
 
 }

@@ -170,13 +170,13 @@ class EmailFilterTest {
 	@Test
 	void testReceivedDate() {
 		final EmailFilter emailFilter = EmailFilter.filter()
-			.receivedDate(EmailFilter.Operator.EQ, 1000)
-			.sentDate(EmailFilter.Operator.GT, 2000);
+			.receivedDate(EmailFilter.Operator.EQ, 1524575533757L)
+			.sentDate(EmailFilter.Operator.GT, 1524575533757L);
 
 		final SearchTerm expected =
 			new AndTerm(
-				new ReceivedDateTerm(3, new Date(1000)),
-				new SentDateTerm(5, new Date(2000))
+				new ReceivedDateTerm(3, new Date(1524575533757L)),
+				new SentDateTerm(5, new Date(1524575533757L))
 			);
 
 		assertEquals(expected, emailFilter.searchTerm);

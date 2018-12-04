@@ -25,16 +25,6 @@
 
 package jodd.props;
 
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.*;
-import java.util.stream.Stream;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,6 +32,28 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class PropsTest extends BasePropsTest {
 
@@ -936,6 +948,42 @@ class PropsTest extends BasePropsTest {
 		assertEquals("line1|   line2|   line3|   line4", props.getValue("text"));
 	}
 
+	@Test
+	void testLoad_with_file_props() throws IOException, URISyntaxException {
+		final File src = readDataToFile("test2.props");
+		final Props actual = new Props().load(src);
+
+		// asserts
+		assertEquals(3, actual.countTotalProperties());
+	}
+
+	@Test
+	void testLoad_with_file_properties() throws IOException, URISyntaxException {
+		final File src = readDataToFile("test.properties");
+		final Props actual = new Props().load(src);
+
+		// asserts
+		assertEquals(3, actual.countTotalProperties());
+	}
+
+	@Test
+	void testLoad_with_file_and_encoding() throws IOException, URISyntaxException {
+		final File src = readDataToFile("test2.props");
+		final Props actual = new Props().load(src, StandardCharsets.UTF_8.name());
+
+		// asserts
+		assertEquals(3, actual.countTotalProperties());
+	}
+
+	@Test
+	void testLoad_with_inputstream() throws IOException {
+		try (final InputStream is = readDataToInputstream("test2.props")) {
+			final Props actual = new Props().load(is);
+			// asserts
+			assertEquals(3, actual.countTotalProperties());
+		}
+	}
+
 	@Nested
 	@DisplayName("test for Props#getXXXValue() - methods")
 	@TestInstance(TestInstance.Lifecycle.PER_CLASS) // needed because annotation MethodSource requires static method without that
@@ -987,6 +1035,26 @@ class PropsTest extends BasePropsTest {
 			assertEquals(expected, actual);
 		}
 
+		@ParameterizedTest (name = "{index} - Props#{1}(''{2}'', {3}, ''{4}'') == {0}")
+		@MethodSource(value = "testdata_for_defaultvalues_and_profiles_test")
+		void testGetXXXValue_WithDefaultValueAndProfiles(final Object expected, final String methodName, final String key, final Class clazzDefaultValue, final String[] profiles) throws Exception {
+			Method method = props.getClass().getDeclaredMethod(methodName, String.class, expected.getClass(), String[].class);
+			final Object actual = method.invoke(props, key, expected, new String[] {"jodd"});
+
+			// asserts
+			assertEquals(expected, actual);
+		}
+
+		@ParameterizedTest (name = "{index} - Props#{1}(''{2}'', {3}) == {0}")
+		@MethodSource(value = "testdata_for_defaultvalues_test")
+		void testGetXXXValue_WithDefaultValue(final Object expected, final String methodName, final String key, final Class clazzDefaultValue) throws Exception {
+			Method method = props.getClass().getDeclaredMethod(methodName, String.class, expected.getClass());
+			final Object actual = method.invoke(props, key, expected);
+
+			// asserts
+			assertEquals(expected, actual);
+		}
+
 		private Stream<Arguments> testdata() {
 			return Stream.of(
 					// getValue
@@ -1012,6 +1080,46 @@ class PropsTest extends BasePropsTest {
 					Arguments.of(-43478954.44D, "getDoubleValue", "double_-43478954.44"),
 					Arguments.of(null, "getDoubleValue", "unknown_key")
 			);
+		}
+
+		private Stream<Arguments> testdata_for_defaultvalues_and_profiles_test() {
+			final String an_unknown_key = "this_is_definitely_an_unknown_key_for_test_in_props_test";
+			final String[] profiles = new String[] {"jodd", "db"};
+			return Stream.of(
+					// getBooleanValue
+					Arguments.of(Boolean.FALSE, "getBooleanValue", an_unknown_key, Boolean.class, profiles),
+					Arguments.of(Boolean.TRUE, "getBooleanValue", "boolean_true", Boolean.class, profiles),
+					// getIntegerValue
+					Arguments.of(-45232, "getIntegerValue", an_unknown_key, Integer.class, profiles),
+					Arguments.of(0, "getIntegerValue", "integer_0", Integer.class, profiles),
+					// getLongValue
+					Arguments.of(1234567890L, "getLongValue", an_unknown_key, Long.class, profiles),
+					Arguments.of(-2789899L, "getLongValue", "long_-2789899", Long.class, profiles),
+					// getDoubleValue
+					Arguments.of(-888.541D, "getDoubleValue", an_unknown_key, Double.class, profiles),
+					Arguments.of(1234567890.12, "getDoubleValue", "double_1234567890_12", Double.class, profiles)
+			);
+		}
+
+		private Stream<Arguments> testdata_for_defaultvalues_test() {
+			final String an_unknown_key = "this_is_definitely_an_unknown_key_for_test_in_props_test";
+			return Stream.of(
+					// getBooleanValue
+					Arguments.of(Boolean.FALSE, "getBooleanValue", an_unknown_key, Boolean.class),
+					Arguments.of(Boolean.TRUE, "getBooleanValue", "boolean_true", Boolean.class),
+					// getIntegerValue
+					Arguments.of(-45232, "getIntegerValue", an_unknown_key, Integer.class),
+					Arguments.of(0, "getIntegerValue", "integer_0", Integer.class),
+					// getLongValue
+					Arguments.of(0L, "getLongValue",  an_unknown_key, Long.class),
+					Arguments.of(-2789899L, "getLongValue", "long_-2789899", Long.class),
+					// getDoubleValue
+					Arguments.of(-888.541D, "getDoubleValue", an_unknown_key, Double.class),
+					Arguments.of(1234567890.12, "getDoubleValue", "double_1234567890_12", Double.class),
+					// getValueOrDefault
+					Arguments.of("jodd", "getValueOrDefault", an_unknown_key, String.class),
+					Arguments.of("jodd", "getValueOrDefault", "string_jodd", String.class)
+					);
 		}
 
 	}

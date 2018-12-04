@@ -25,14 +25,15 @@
 
 package jodd.jtx.proxy;
 
-import jodd.jtx.JoddJtx;
-import jodd.jtx.JtxTransactionManager;
 import jodd.jtx.JtxTransactionMode;
-import jodd.jtx.meta.TransactionAnnotation;
-import jodd.jtx.meta.TransactionAnnotationData;
+import jodd.jtx.meta.ReadOnlyTransaction;
+import jodd.jtx.meta.ReadWriteTransaction;
+import jodd.jtx.meta.Transaction;
+import jodd.jtx.meta.TransactionAnnotationValues;
 import jodd.jtx.worker.LeanJtxWorker;
 import jodd.proxetta.ProxettaException;
 import jodd.util.StringUtil;
+import jodd.util.annotation.AnnotationParser;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -56,36 +57,27 @@ public class AnnotationTxAdviceManager {
 	protected final String scopePattern;
 
 	protected Class<? extends Annotation>[] annotations;
-	protected TransactionAnnotation[] annotationInstances;
+	protected AnnotationParser[] annotationParsers;
 
 	// ---------------------------------------------------------------- ctors
 
-	public AnnotationTxAdviceManager(final JtxTransactionManager jtxManager) {
-		this(new LeanJtxWorker(jtxManager));
-	}
-	
 	public AnnotationTxAdviceManager(final LeanJtxWorker jtxWorker) {
 		this(jtxWorker, JTXCTX_PATTERN_CLASS + '#' + JTXCTX_PATTERN_METHOD, null);
-	}
-
-	public AnnotationTxAdviceManager(final JtxTransactionManager jtxManager, final String scopePattern) {
-		this(new LeanJtxWorker(jtxManager), scopePattern);
 	}
 
 	public AnnotationTxAdviceManager(final LeanJtxWorker jtxWorker, final String scopePattern) {
 		this(jtxWorker, scopePattern, null);
 	}
 
-	public AnnotationTxAdviceManager(final JtxTransactionManager jtxManager, final String scopePattern, final JtxTransactionMode defaultTxMode) {
-		this(new LeanJtxWorker(jtxManager), scopePattern, defaultTxMode);
-	}
-
 	@SuppressWarnings( {"unchecked"})
 	public AnnotationTxAdviceManager(final LeanJtxWorker jtxWorker, final String scopePattern, final JtxTransactionMode defaultTxMode) {
 		this.jtxWorker = jtxWorker;
-		this.defaultTransactionMode = defaultTxMode == null ? new JtxTransactionMode().propagationSupports() : defaultTxMode;
+		this.defaultTransactionMode = defaultTxMode == null ? JtxTransactionMode.PROPAGATION_SUPPORTS_READ_ONLY : defaultTxMode;
 		this.scopePattern = scopePattern;
-		registerAnnotations(JoddJtx.defaults().getTxAnnotations());
+
+		registerAnnotations(new Class[] {
+			Transaction.class, ReadWriteTransaction.class, ReadOnlyTransaction.class
+		});
 	}
 
 	// ---------------------------------------------------------------- methods
@@ -130,20 +122,21 @@ public class AnnotationTxAdviceManager {
 		if (txMode == null) {
 			if (!txmap.containsKey(signature)) {
 
-				Method m;
+				final Method m;
 				try {
 					m = type.getMethod(methodName, methodArgTypes);
 				} catch (NoSuchMethodException nsmex) {
 					throw new ProxettaException(nsmex);
 				}
 
-				TransactionAnnotationData txAnn = getTransactionAnnotation(m);
+				final TransactionAnnotationValues txAnn = readTransactionAnnotation(m);
 				if (txAnn != null) {
-					txMode = new JtxTransactionMode();
-					txMode.setPropagationBehaviour(txAnn.propagation());
-					txMode.setIsolationLevel(txAnn.isolation());
-					txMode.setReadOnly(txAnn.readOnly());
-					txMode.setTransactionTimeout(txAnn.timeout());
+					txMode = new JtxTransactionMode(
+						txAnn.propagation(),
+						txAnn.isolation(),
+						txAnn.readOnly(),
+						txAnn.timeout()
+					);
 				} else {
 					txMode = defaultTransactionMode;
 				}
@@ -156,26 +149,32 @@ public class AnnotationTxAdviceManager {
 	// ---------------------------------------------------------------- tx annotations
 
 	/**
-	 * Registers tx annotations.
+	 * Returns current TX annotations.
+	 */
+	public Class<? extends Annotation>[] getAnnotations() {
+		return annotations;
+	}
+
+	/**
+	 * Registers new TX annotations.
 	 */
 	@SuppressWarnings( {"unchecked"})
-	public void registerAnnotations(final Class<? extends Annotation>... txAnnotations) {
-		this.annotations = txAnnotations;
+	public void registerAnnotations(final Class<? extends Annotation>[] annotations) {
+		this.annotations = annotations;
 
-		this.annotationInstances = new TransactionAnnotation<?>[annotations.length];
+		this.annotationParsers = new AnnotationParser[annotations.length];
+
 		for (int i = 0; i < annotations.length; i++) {
-			Class<? extends Annotation> annotationClass = annotations[i];
-			annotationInstances[i] = new TransactionAnnotation(annotationClass);
+			annotationParsers[i] = TransactionAnnotationValues.parserFor(annotations[i]);
 		}
-
 	}
 
 	/**
 	 * Finds TX annotation.
 	 */
-	protected TransactionAnnotationData getTransactionAnnotation(final Method method) {
-		for (TransactionAnnotation annotationInstance : annotationInstances) {
-			TransactionAnnotationData tad = annotationInstance.readAnnotatedElement(method);
+	protected TransactionAnnotationValues readTransactionAnnotation(final Method method) {
+		for (AnnotationParser annotationParser : annotationParsers) {
+			TransactionAnnotationValues tad = TransactionAnnotationValues.of(annotationParser, method);
 			if (tad != null) {
 				return tad;
 			}

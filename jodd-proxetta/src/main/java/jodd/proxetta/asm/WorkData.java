@@ -25,7 +25,7 @@
 
 package jodd.proxetta.asm;
 
-import jodd.asm6.ClassVisitor;
+import jodd.asm7.ClassVisitor;
 import jodd.util.StringPool;
 
 import java.util.ArrayList;
@@ -55,6 +55,7 @@ public final class WorkData {
 	String wrapperRef;
 	String wrapperType;
 	boolean wrapInterface;
+	boolean allowFinalMethods;
 
 	public String thisReference;
 	public boolean proxyApplied;

@@ -26,6 +26,7 @@
 package jodd.db.oom;
 
 import jodd.db.DbCallResult;
+import jodd.db.DbOom;
 import jodd.db.DbQuery;
 import jodd.db.DbSession;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class CallableTest extends DbBaseTest {
 
 	class PostgreSql extends PostgreSqlDbAccess {
 		@Override
-		public String getCreateTableSql() {
+		public String createTableSql() {
 			return "create table TESTER (" +
 				"ID			SERIAL," +
 				"NAME		varchar(20)	NOT NULL," +
@@ -54,9 +55,7 @@ class CallableTest extends DbBaseTest {
 	@Test
 	void testCallableStatementDebugFalse() {
 		DbBaseTest.DbAccess db = new PostgreSql();
-		init();
-		db.initDb();
-		connect();
+		init(db);
 
 		db.createTables();
 		try {
@@ -69,9 +68,7 @@ class CallableTest extends DbBaseTest {
 	@Test
 	void testCallableStatementDebugTrue() {
 		DbBaseTest.DbAccess db = new PostgreSql();
-		init();
-		db.initDb();
-		connect();
+		init(db);
 
 		db.createTables();
 		try {
@@ -82,9 +79,9 @@ class CallableTest extends DbBaseTest {
 	}
 
 	private void test(final boolean debug) {
-		DbSession session = new DbSession();
+		DbSession session = new DbSession(connectionPool);
 
-		DbQuery dbQuery = new DbQuery(session, "{ :upp = call upper( :str ) }");
+		DbQuery dbQuery = new DbQuery(DbOom.get(), session, "{ :upp = call upper( :str ) }");
 		dbQuery.setDebug(debug);
 
 		dbQuery.setString("str", "some lowercase value");

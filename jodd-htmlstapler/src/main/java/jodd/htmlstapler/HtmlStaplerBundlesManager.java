@@ -25,6 +25,7 @@
 
 package jodd.htmlstapler;
 
+import jodd.crypt.DigestEngine;
 import jodd.io.FileNameUtil;
 import jodd.io.FileUtil;
 import jodd.io.NetUtil;
@@ -32,14 +33,13 @@ import jodd.io.ZipUtil;
 import jodd.io.findfile.FindFile;
 import jodd.log.Logger;
 import jodd.log.LoggerFactory;
+import jodd.system.SystemUtil;
 import jodd.util.Base32;
 import jodd.util.CharUtil;
 import jodd.util.RandomString;
 import jodd.util.StringBand;
 import jodd.util.StringPool;
 import jodd.util.StringUtil;
-import jodd.util.SystemUtil;
-import jodd.util.crypt.DigestEngine;
 
 import java.io.File;
 import java.io.IOException;
@@ -110,7 +110,7 @@ public class HtmlStaplerBundlesManager {
 		this.contextPath = contextPath;
 		this.webRoot = webRoot;
 		this.strategy = strategy;
-		this.bundleFolder = SystemUtil.tempDir();
+		this.bundleFolder = SystemUtil.info().getTempDir();
 
 		if (strategy == Strategy.ACTION_MANAGED) {
 			actionBundles = new HashMap<>();
@@ -362,7 +362,7 @@ public class HtmlStaplerBundlesManager {
 		}
 
 		// create unique digest from the collected sources
-		String[] sourcesArray = sources.toArray(new String[sources.size()]);
+		String[] sourcesArray = sources.toArray(new String[0]);
 		for (int i = 0, sourcesArrayLength = sourcesArray.length; i < sourcesArrayLength; i++) {
 			sourcesArray[i] = sourcesArray[i].trim().toLowerCase();
 		}

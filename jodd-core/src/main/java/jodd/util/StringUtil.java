@@ -37,6 +37,7 @@ import static jodd.util.StringPool.EMPTY;
 
 /**
  * Various String utilities.
+ * For even more String utilities, see {@link Format}.
  */
 public class StringUtil {
 
@@ -198,11 +199,11 @@ public class StringUtil {
 		}
 		StringBuilder sb = new StringBuilder(s.length());
 		do {
-			 sb.append(s.substring(c, i));
+			 sb.append(s, c, i);
 			 c = i + sublen;
 		 } while ((i = s.indexOf(sub, c)) != -1);
 		 if (c < s.length()) {
-			 sb.append(s.substring(c, s.length()));
+			 sb.append(s, c, s.length());
 		 }
 		 return sb.toString();
 	}
@@ -322,7 +323,7 @@ public class StringUtil {
 	/**
 	 * Determines if string is not blank.
 	 */
-	public static boolean isNotBlank(final String string) {
+	public static boolean isNotBlank(final CharSequence string) {
 		return ((string != null) && !containsOnlyWhitespaces(string));
 	}
 
@@ -411,82 +412,6 @@ public class StringUtil {
 
 		return value.toString();
 	}
-
-	/**
-	 * Converts object into pretty string. All arrays are iterated.
-	 */
-	public static String toPrettyString(final Object value) {
-		if (value == null) {
-			return StringPool.NULL;
-		}
-
-		Class<?> type = value.getClass();
-
-		if (type.isArray()) {
-			Class componentType = type.getComponentType();
-
-			if (componentType.isPrimitive()) {
-				StringBuilder sb = new StringBuilder();
-				sb.append('[');
-
-				if (componentType == int.class) {
-					sb.append(ArraysUtil.toString((int[]) value));
-				}
-				else if (componentType == long.class) {
-					sb.append(ArraysUtil.toString((long[]) value));
-				}
-				else if (componentType == double.class) {
-					sb.append(ArraysUtil.toString((double[]) value));
-				}
-				else if (componentType == float.class) {
-					sb.append(ArraysUtil.toString((float[]) value));
-				}
-				else if (componentType == boolean.class) {
-					sb.append(ArraysUtil.toString((boolean[]) value));
-				}
-				else if (componentType == short.class) {
-					sb.append(ArraysUtil.toString((short[]) value));
-				}
-				else if (componentType == byte.class) {
-					sb.append(ArraysUtil.toString((byte[]) value));
-				} else {
-					throw new IllegalArgumentException();
-				}
-				sb.append(']');
-				return sb.toString();
-			} else {
-				StringBuilder sb = new StringBuilder();
-				sb.append('[');
-
-				Object[] array = (Object[]) value;
-				for (int i = 0; i < array.length; i++) {
-					if (i > 0) {
-						sb.append(',');
-					}
-					sb.append(toPrettyString(array[i]));
-				}
-				sb.append(']');
-				return sb.toString();
-			}
-		} else if (value instanceof Iterable) {
-			Iterable iterable = (Iterable) value;
-			StringBuilder sb = new StringBuilder();
-			sb.append('{');
-			int i = 0;
-			for (Object o : iterable) {
-				if (i > 0) {
-					sb.append(',');
-				}
-				sb.append(toPrettyString(o));
-				i++;
-			}
-			sb.append('}');
-			return sb.toString();
-		}
-
-		return value.toString();
-	}
-
 
 	/**
 	 * Converts an array object to array of strings, where every element
@@ -1702,7 +1627,7 @@ public class StringUtil {
 				break;
 			}
 			int end = res[1];
-			buf.append(s.substring(start, end));
+			buf.append(s, start, end);
 			buf.append(with[res[0]]);
 			start = end + sub[res[0]].length();
 		}
@@ -1731,7 +1656,7 @@ public class StringUtil {
 				break;
 			}
 			int end = res[1];
-			buf.append(s.substring(start, end));
+			buf.append(s, start, end);
 			buf.append(with[res[0]]);
 			start = end + sub[0].length();
 		}
@@ -2358,73 +2283,6 @@ public class StringUtil {
 		return StringUtil.newString(StringUtil.getBytes(source, srcCharsetName), newCharsetName);
 	}
 
-	/**
-	 * Escapes a string using java rules.
-	 */
-	public static String escapeJava(final String string) {
-		int strLen = string.length();
-		StringBuilder sb = new StringBuilder(strLen);
-
-		for (int i = 0; i < strLen; i++) {
-			char c = string.charAt(i);
-			switch (c) {
-				case '\b' : sb.append("\\b"); break;
-				case '\t' : sb.append("\\t"); break;
-				case '\n' : sb.append("\\n"); break;
-				case '\f' : sb.append("\\f"); break;
-				case '\r' : sb.append("\\r"); break;
-				case '\"' : sb.append("\\\""); break;
-				case '\\' : sb.append("\\\\"); break;
-				default:
-					if ((c < 32) || (c > 127)) {
-						String hex = Integer.toHexString(c);
-						sb.append("\\u");
-						for (int k = hex.length(); k < 4; k++) {
-							sb.append('0');
-						}
-						sb.append(hex);
-					} else {
-						sb.append(c);
-					}
-			}
-		}
-		return sb.toString();
-	}
-
-	/**
-	 * Unescapes a string using java rules.
-	 */
-	public static String unescapeJava(final String str) {
-		char[] chars = str.toCharArray();
-
-		StringBuilder sb = new StringBuilder(str.length());
-		for (int i = 0; i < chars.length; i++) {
-			char c = chars[i];
-			if (c != '\\') {
-				sb.append(c);
-				continue;
-			}
-			i++;
-			c = chars[i];
-			switch (c) {
-				case 'b': sb.append('\b'); break;
-				case 't': sb.append('\t'); break;
-				case 'n': sb.append('\n'); break;
-				case 'f': sb.append('\f'); break;
-				case 'r': sb.append('\r'); break;
-				case '"': sb.append('\"'); break;
-				case '\\': sb.append('\\'); break;
-				case 'u' :
-					char hex = (char) Integer.parseInt(new String(chars, i + 1, 4), 16);
-					sb.append(hex);
-					i += 4;
-					break;
-				default:
-					throw new IllegalArgumentException("Invalid escaping character: " + c);
-			}
-		}
-		return sb.toString();
-	}
 
 	// ---------------------------------------------------------------- chars
 
@@ -2712,79 +2570,6 @@ public class StringUtil {
 		return sb.toString();
 	}
 
-	// ---------------------------------------------------------------- camel case
-
-	/**
-	 * Changes CamelCase string to lower case words separated by provided
-	 * separator character. The following translations are applied:
-	 * <ul>
-	 *     <li>Every upper case letter in the CamelCase name is translated into
-	 * two characters, a separator and the lower case equivalent of the target character,
-	 * with three exceptions.
-	 * 		<ol><li>For contiguous sequences of upper case letters, characters after the first
-	 * character are replaced only by their lower case equivalent, and are not
-	 * preceded by a separator (<code>theFOO</code> to <code>the_foo</code>).
-	 *		<li>An upper case character in the first position of the CamelCase name
-	 * is not preceded by a separator character, and is translated only to its
-	 * lower case equivalent. (<code>Foo</code> to <code>foo</code> and not <code>_foo</code>)
-	 * 		<li>An upper case character in the CamelCase name that is already preceded
-	 * by a separator character is translated only to its lower case equivalent,
-	 * and is not preceded by an additional separator. (<code>user_Name</code>
-	 * to <code>user_name</code> and not <code>user__name</code>.
-	 * 		</ol>
-	 * <li>If the CamelCase name starts with a separator, then that
-	 * separator is not included in the translated name, unless the CamelCase
-	 * name is just one character in length, i.e., it is the separator character.
-	 * This applies only to the first character of the CamelCase name.
-	 * </ul>
-	 */
-	public static String fromCamelCase(final String input, final char separator) {
-		int length = input.length();
-		StringBuilder result = new StringBuilder(length * 2);
-		int resultLength = 0;
-		boolean prevTranslated = false;
-		for (int i = 0; i < length; i++) {
-			char c = input.charAt(i);
-			if (i > 0 || c != separator) {// skip first starting separator
-				if (Character.isUpperCase(c)) {
-					if (!prevTranslated && resultLength > 0 && result.charAt(resultLength - 1) != separator) {
-						result.append(separator);
-						resultLength++;
-					}
-					c = Character.toLowerCase(c);
-					prevTranslated = true;
-				} else {
-					prevTranslated = false;
-				}
-				result.append(c);
-				resultLength++;
-			}
-		}
-		return resultLength > 0 ? result.toString() : input;
-	}
-
-	/**
-	 * Converts separated string value to CamelCase.
-	 */
-	public static String toCamelCase(final String input, final boolean firstCharUppercase, final char separator) {
-		int length = input.length();
-		StringBuilder sb = new StringBuilder(length);
-		boolean upperCase = firstCharUppercase;
-
-		for (int i = 0; i < length; i++) {
-			char ch = input.charAt(i);
-			if (ch == separator) {
-				upperCase = true;
-			} else if (upperCase) {
-				sb.append(Character.toUpperCase(ch));
-				upperCase = false;
-			} else {
-				sb.append(ch);
-			}
-		}
-		return sb.toString();
-	}
-
 	// ---------------------------------------------------------------- prefixes
 
 	/**
@@ -2841,71 +2626,6 @@ public class StringUtil {
 		}
 
 		return s;
-	}
-
-	// ---------------------------------------------------------------- text
-
-	/**
-	 * Formats provided string as paragraph.
-	 */
-	public static String formatParagraph(final String src, final int len, final boolean breakOnWhitespace) {
-		StringBuilder str = new StringBuilder();
-		int total = src.length();
-		int from = 0;
-		while (from < total) {
-			int to = from + len;
-			if (to >= total) {
-				to = total;
-			} else if (breakOnWhitespace) {
-				int ndx = lastIndexOfWhitespace(src, to - 1, from);
-				if (ndx != -1) {
-					to = ndx + 1;
-				}
-			}
-			int cutFrom = indexOfNonWhitespace(src, from, to);
-			if (cutFrom != -1) {
-				int cutTo = lastIndexOfNonWhitespace(src, to - 1, from) + 1;
-				str.append(src.substring(cutFrom, cutTo));
-			}
-			str.append('\n');
-			from = to;
-		}
-		return str.toString();
-	}
-
-	/**
-	 * Converts all tabs on a line to spaces according to the provided tab width.
-	 * This is not a simple tab to spaces replacement, since the resulting
-	 * indentation remains the same.
-	 */
-	public static String convertTabsToSpaces(final String line, final int tabWidth) {
-		int tab_index, tab_size;
-		int last_tab_index = 0;
-		int added_chars = 0;
-
-		if (tabWidth == 0) {
-			return remove(line, '\t');
-		}
-
-		StringBuilder result = new StringBuilder();
-
-		while ((tab_index = line.indexOf('\t', last_tab_index)) != -1) {
-			tab_size = tabWidth - ((tab_index + added_chars) % tabWidth);
-			if (tab_size == 0) {
-				tab_size = tabWidth;
-			}
-			added_chars += tab_size - 1;
-			result.append(line.substring(last_tab_index, tab_index));
-			result.append(repeat(' ', tab_size));
-			last_tab_index = tab_index+1;
-		}
-
-		if (last_tab_index == 0) {
-			return line;
-		}
-
-		result.append(line.substring(last_tab_index));
-		return result.toString();
 	}
 
 	// ---------------------------------------------------------------- case change
@@ -3033,7 +2753,8 @@ public class StringUtil {
 	public static String removeQuotes(final String string) {
 		if (
 			(startsWithChar(string, '\'') && endsWithChar(string, '\'')) ||
-			(startsWithChar(string, '"') && endsWithChar(string, '"'))
+			(startsWithChar(string, '"') && endsWithChar(string, '"')) ||
+			(startsWithChar(string, '`') && endsWithChar(string, '`'))
 		) {
 			return substring(string, 1, -1);
 		}
@@ -3077,7 +2798,7 @@ public class StringUtil {
 	 */
 	public static byte[] getBytes(final String string) {
 		try {
-			return string.getBytes(JoddCore.defaults().getEncoding());
+			return string.getBytes(JoddCore.encoding);
 		} catch (UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
@@ -3092,7 +2813,7 @@ public class StringUtil {
 
 	public static String newString(final byte[] bytes) {
 		try {
-			return new String(bytes, JoddCore.defaults().getEncoding());
+			return new String(bytes, JoddCore.encoding);
 		} catch (UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
@@ -3105,4 +2826,26 @@ public class StringUtil {
 		}
 	}
 
+	// ---------------------------------------------------------------- detectors
+
+	/**
+	 * Detects quote character or return 0.
+	 */
+	public static char detectQuoteChar(final String str) {
+		if (str.length() < 2) {
+			return 0;
+		}
+
+		final char c = str.charAt(0);
+
+		if (c != str.charAt(str.length() - 1)) {
+			return 0;
+		}
+
+		if (c == '\'' || c == '"' || c == '`') {
+			return c;
+		}
+
+		return 0;
+	}
 }

@@ -27,7 +27,6 @@ package jodd.mail;
 
 import jodd.util.StringPool;
 
-import javax.mail.Authenticator;
 import javax.mail.NoSuchProviderException;
 import javax.mail.Session;
 import javax.mail.Store;
@@ -38,10 +37,6 @@ import java.util.Properties;
  */
 public class ImapServer extends MailServer<ReceiveMailSession> {
 
-	protected static final String MAIL_IMAP_PORT = "mail.imap.port";
-	protected static final String MAIL_IMAP_HOST = "mail.imap.host";
-	protected static final String MAIL_IMAP_PARTIALFETCH = "mail.imap.partialfetch";
-
 	protected static final String PROTOCOL_IMAP = "imap";
 
 	/**
@@ -49,16 +44,28 @@ public class ImapServer extends MailServer<ReceiveMailSession> {
 	 */
 	protected static final int DEFAULT_IMAP_PORT = 143;
 
-	public ImapServer(final String host, final int port, final Authenticator authenticator) {
-		super(host, port == -1 ? DEFAULT_IMAP_PORT : port, authenticator);
+	public ImapServer(final Builder builder) {
+		super(builder, DEFAULT_IMAP_PORT);
 	}
+	protected ImapServer(final Builder builder, final int defaultPort) {
+		super(builder, defaultPort);
+	}
+
 
 	@Override
 	protected Properties createSessionProperties() {
-		final Properties props = new Properties();
-		props.setProperty(MAIL_IMAP_HOST, getHost());
-		props.setProperty(MAIL_IMAP_PORT, String.valueOf(getPort()));
+		final Properties props = super.createSessionProperties();
+
+		props.setProperty(MAIL_IMAP_HOST, host);
+		props.setProperty(MAIL_IMAP_PORT, String.valueOf(port));
 		props.setProperty(MAIL_IMAP_PARTIALFETCH, StringPool.FALSE);
+
+		if (timeout > 0) {
+			final String timeoutValue = String.valueOf(timeout);
+			props.put(MAIL_IMAP_CONNECTIONTIMEOUT, timeoutValue);
+			props.put(MAIL_IMAP_TIMEOUT, timeoutValue);
+		}
+
 		return props;
 	}
 
@@ -79,7 +86,11 @@ public class ImapServer extends MailServer<ReceiveMailSession> {
 	 */
 	@Override
 	public ReceiveMailSession createSession() {
-		return EmailUtil.createSession(PROTOCOL_IMAP, getSessionProperties(), getAuthenticator());
+		return EmailUtil.createSession(
+			PROTOCOL_IMAP,
+			createSessionProperties(),
+			authenticator,
+			attachmentStorage);
 	}
 
 }

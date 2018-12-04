@@ -31,84 +31,29 @@ import jodd.madvoc.path.ActionNamingStrategy;
 import jodd.madvoc.result.ActionResult;
 
 /**
- * Action configuration.
+ * Common configuration for actions.
  */
-public class ActionConfig {
+public interface ActionConfig {
 
-	private final ActionConfig parent;
+	Class<? extends ActionResult> getActionResult();
 
-	private Class<? extends ActionResult> actionResult;
-	private Class<? extends ActionInterceptor>[] interceptors;
-	private Class<? extends ActionFilter>[] filters;
-	private String[] actionMethodNames;
-	private Class<? extends ActionNamingStrategy> namingStrategy;
+	/**
+	 * Returns the list of interceptors of this action.
+	 */
+	Class<? extends ActionInterceptor>[] getInterceptors();
 
-	public ActionConfig(final ActionConfig parentActionConfig) {
-		this.parent = parentActionConfig;
-	}
+	/**
+	 * Returns the list of filters over this action.
+	 */
+	Class<? extends ActionFilter>[] getFilters();
 
-	public Class<? extends ActionResult> getActionResult() {
-		if (actionResult == null) {
-			if (parent != null) {
-				return parent.getActionResult();
-			}
-		}
-		return actionResult;
-	}
+	/**
+	 * Returns a list of action method names that can be ignored.
+	 */
+	String[] getActionMethodNames();
 
-	public void setActionResult(final Class<? extends ActionResult> actionResult) {
-		this.actionResult = actionResult;
-	}
-
-	public Class<? extends ActionInterceptor>[] getInterceptors() {
-		if (interceptors == null) {
-			if (parent != null) {
-				return parent.getInterceptors();
-			}
-		}
-		return interceptors;
-	}
-
-	public void setInterceptors(final Class<? extends ActionInterceptor>... interceptors) {
-		this.interceptors = interceptors;
-	}
-
-	public Class<? extends ActionFilter>[] getFilters() {
-		if (filters == null) {
-			if (parent != null) {
-				return parent.getFilters();
-			}
-		}
-		return filters;
-	}
-
-	public void setFilters(final Class<? extends ActionFilter>... filters) {
-		this.filters = filters;
-	}
-
-	public String[] getActionMethodNames() {
-		if (actionMethodNames == null) {
-			if (parent != null) {
-				return parent.getActionMethodNames();
-			}
-		}
-		return actionMethodNames;
-	}
-
-	public void setActionMethodNames(final String... actionMethodNames) {
-		this.actionMethodNames = actionMethodNames;
-	}
-
-	public Class<? extends ActionNamingStrategy> getNamingStrategy() {
-		if (namingStrategy == null) {
-			if (parent != null) {
-				return parent.getNamingStrategy();
-			}
-		}
-		return namingStrategy;
-	}
-
-	public void setNamingStrategy(final Class<? extends ActionNamingStrategy> namingStrategy) {
-		this.namingStrategy = namingStrategy;
-	}
+	/**
+	 * Returns naming strategy used when created a mapping to an action path.
+	 */
+	Class<? extends ActionNamingStrategy> getNamingStrategy();
 }

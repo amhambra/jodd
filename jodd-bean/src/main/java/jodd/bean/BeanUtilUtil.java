@@ -27,6 +27,7 @@ package jodd.bean;
 
 import jodd.introspector.ClassIntrospector;
 import jodd.introspector.Getter;
+import jodd.introspector.MapperFunction;
 import jodd.introspector.Setter;
 import jodd.typeconverter.TypeConverterManager;
 import jodd.util.ClassUtil;
@@ -48,8 +49,8 @@ abstract class BeanUtilUtil implements BeanUtil {
 
 	// ---------------------------------------------------------------- introspector
 
-	protected ClassIntrospector introspector = JoddBean.defaults().getClassIntrospector();
-	protected TypeConverterManager typeConverterManager = JoddBean.defaults().getTypeConverterManager();
+	protected ClassIntrospector introspector = ClassIntrospector.get();
+	protected TypeConverterManager typeConverterManager = TypeConverterManager.get();
 
 	/**
 	 * Sets {@link ClassIntrospector introspector} implementation.
@@ -59,24 +60,10 @@ abstract class BeanUtilUtil implements BeanUtil {
 	}
 
 	/**
-	 * Returns {@link ClassIntrospector introspector} implementation.
-	 */
-	public ClassIntrospector getIntrospector() {
-		return introspector;
-	}
-
-	/**
 	 * Sets {@link TypeConverterManager type converter manager} implementation.
 	 */
 	public void setTypeConverterManager(final TypeConverterManager typeConverterManager) {
 		this.typeConverterManager = typeConverterManager;
-	}
-
-	/**
-	 * Returns {@link TypeConverterManager type converter manager} implementation.
-	 */
-	public TypeConverterManager getTypeConverterManager() {
-		return typeConverterManager;
 	}
 
 	/**
@@ -105,7 +92,14 @@ abstract class BeanUtilUtil implements BeanUtil {
 	 */
 	protected Object invokeSetter(final Setter setter, final BeanProperty bp, Object value) {
 		try {
-			Class type = setter.getSetterRawType();
+
+			final MapperFunction setterMapperFunction = setter.getMapperFunction();
+
+			if (setterMapperFunction != null) {
+				value = setterMapperFunction.apply(value);
+			}
+
+			final Class type = setter.getSetterRawType();
 
 			if (ClassUtil.isTypeOf(type, Collection.class)) {
 				Class componentType = setter.getSetterRawComponentType();

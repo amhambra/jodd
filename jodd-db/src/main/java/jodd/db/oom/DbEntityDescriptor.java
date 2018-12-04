@@ -26,11 +26,12 @@
 package jodd.db.oom;
 
 import jodd.bean.BeanUtil;
-import jodd.bean.JoddBean;
 import jodd.db.oom.naming.ColumnNamingStrategy;
 import jodd.db.oom.naming.TableNamingStrategy;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.PropertyDescriptor;
 import jodd.util.StringPool;
+import jodd.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,14 +43,26 @@ import java.util.List;
  */
 public class DbEntityDescriptor<E> {
 
-	public DbEntityDescriptor(final Class<E> type, final String schemaName, final TableNamingStrategy tableNamingStrategy, final ColumnNamingStrategy columnNamingStrategy) {
+	public DbEntityDescriptor(
+			final Class<E> type,
+			final String schemaName,
+			final TableNamingStrategy tableNamingStrategy,
+			final ColumnNamingStrategy columnNamingStrategy) {
+
 		this.type = type;
 		this.entityName = type.getSimpleName();
 		this.isAnnotated = DbMetaUtil.resolveIsAnnotated(type);
 		this.schemaName = DbMetaUtil.resolveSchemaName(type, schemaName);
-		this.tableName = DbMetaUtil.resolveTableName(type, tableNamingStrategy);
 		this.columnNamingStrategy = columnNamingStrategy;
 		this.mappedTypes = DbMetaUtil.resolveMappedTypes(type);
+
+		this.tableNameForQuery = DbMetaUtil.resolveTableName(type, tableNamingStrategy);
+
+		if (StringUtil.detectQuoteChar(tableNameForQuery) != 0) {
+			this.tableName = StringUtil.substring(tableNameForQuery, 1, -1);
+		} else {
+			this.tableName = tableNameForQuery;
+		}
 	}
 
 	// ---------------------------------------------------------------- type and table
@@ -58,6 +71,7 @@ public class DbEntityDescriptor<E> {
 	private final String entityName;
 	private final boolean isAnnotated;
 	private final String tableName;
+	private final String tableNameForQuery;
 	private final String schemaName;
 	private final ColumnNamingStrategy columnNamingStrategy;
 	private final Class[] mappedTypes;
@@ -81,6 +95,13 @@ public class DbEntityDescriptor<E> {
 	 */
 	public String getTableName() {
 		return tableName;
+	}
+
+	/**
+	 * Returns table name to be used when generating queries.
+	 */
+	public String getTableNameForQuery() {
+		return tableNameForQuery;
 	}
 
 	/**
@@ -132,7 +153,7 @@ public class DbEntityDescriptor<E> {
 	 * Resolves list of all columns and properties.
 	 */
 	private void resolveColumnsAndProperties(final Class type) {
-		PropertyDescriptor[] allProperties = JoddBean.defaults().getClassIntrospector().lookup(type).getAllPropertyDescriptors();
+		PropertyDescriptor[] allProperties = ClassIntrospector.get().lookup(type).getAllPropertyDescriptors();
 		List<DbEntityColumnDescriptor> decList = new ArrayList<>(allProperties.length);
 		int idcount = 0;
 
@@ -158,7 +179,7 @@ public class DbEntityDescriptor<E> {
 		if (decList.isEmpty()) {
 			throw new DbOomException("No column mappings in entity: " + type);
 		}
-		columnDescriptors = decList.toArray(new DbEntityColumnDescriptor[decList.size()]);
+		columnDescriptors = decList.toArray(new DbEntityColumnDescriptor[0]);
 		Arrays.sort(columnDescriptors);
 
 		// extract ids from sorted list

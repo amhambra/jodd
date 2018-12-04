@@ -27,15 +27,14 @@ package jodd.madvoc.result;
 
 import jodd.bean.BeanTemplateParser;
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.ScopeType;
 import jodd.madvoc.component.ResultMapper;
 import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
+import jodd.madvoc.meta.scope.MadvocContext;
 import jodd.servlet.DispatcherUtil;
+import jodd.util.StringPool;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
 
 /**
  * Simply redirects to a page using <code>RequestDispatcher</code>.
@@ -43,7 +42,7 @@ import java.io.IOException;
  * @see ServletDispatcherActionResult
  * @see ServletPermanentRedirectActionResult
  */
-public class ServletRedirectActionResult implements ActionResult<Redirect> {
+public class ServletRedirectActionResult implements ActionResult {
 
 	protected final BeanTemplateParser beanTemplateParser = new BeanTemplateParser();
 
@@ -53,24 +52,38 @@ public class ServletRedirectActionResult implements ActionResult<Redirect> {
 		beanTemplateParser.setMacroEnd("}");
 	}
 
-	@In @Scope(ScopeType.CONTEXT)
+	@In @MadvocContext
 	protected ResultMapper resultMapper;
 
 	/**
 	 * Redirects to the given location. Provided path is parsed, action is used as a value context.
 	 */
 	@Override
-	public void render(final ActionRequest actionRequest, final Redirect redirectResult) throws Exception {
-		String resultBasePath = actionRequest.getActionRuntime().getResultBasePath();
+	public void render(final ActionRequest actionRequest, final Object resultValue) throws Exception {
+		final Redirect redirectResult;
 
-		String resultPath;
-		final String resultValue = redirectResult.path();
+		if (resultValue == null) {
+			redirectResult = Redirect.to(StringPool.EMPTY);
+		} else {
+			if (resultValue instanceof String) {
+				redirectResult = Redirect.to((String)resultValue);
+			}
+			else {
+				redirectResult = (Redirect) resultValue;
+			}
+		}
 
-		if (resultValue.startsWith("http://") || resultValue.startsWith("https://")) {
-			resultPath = resultValue;
+		final String resultBasePath = actionRequest.getActionRuntime().getResultBasePath();
+
+		final String redirectPath = redirectResult.path();
+
+		final String resultPath;
+
+		if (redirectPath.startsWith("http://") || redirectPath.startsWith("https://")) {
+			resultPath = redirectPath;
 		}
 		else {
-			resultPath = resultMapper.resolveResultPathString(resultBasePath, resultValue);
+			resultPath = resultMapper.resolveResultPathString(resultBasePath, redirectPath);
 		}
 
 		HttpServletRequest request = actionRequest.getHttpServletRequest();
@@ -79,10 +92,6 @@ public class ServletRedirectActionResult implements ActionResult<Redirect> {
 		String path = resultPath;
 		path = beanTemplateParser.parseWithBean(path, actionRequest.getAction());
 
-		redirect(request, response, path);
-	}
-
-	protected void redirect(final HttpServletRequest request, final HttpServletResponse response, final String path) throws IOException {
 		DispatcherUtil.redirect(request, response, path);
 	}
 

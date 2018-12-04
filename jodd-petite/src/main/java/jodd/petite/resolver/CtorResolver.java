@@ -25,8 +25,8 @@
 
 package jodd.petite.resolver;
 
-import jodd.bean.JoddBean;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.CtorDescriptor;
 import jodd.petite.PetiteException;
 import jodd.petite.def.BeanReferences;
@@ -54,7 +54,7 @@ public class CtorResolver {
 	 */
 	public CtorInjectionPoint resolve(final Class type, final boolean useAnnotation) {
 		// lookup methods
-		ClassDescriptor cd = JoddBean.defaults().getClassIntrospector().lookup(type);
+		ClassDescriptor cd = ClassIntrospector.get().lookup(type);
 		CtorDescriptor[] allCtors = cd.getAllCtorDescriptors();
 		Constructor foundedCtor = null;
 		Constructor defaultCtor = null;
@@ -65,7 +65,7 @@ public class CtorResolver {
 
 			Class<?>[] paramTypes = ctor.getParameterTypes();
 			if (paramTypes.length == 0) {
-				defaultCtor = ctor;	// detects default ctors
+				defaultCtor = ctor;     // detects default ctors
 			}
 
 			if (!useAnnotation) {
@@ -91,17 +91,19 @@ public class CtorResolver {
 				foundedCtor = allCtors[0].getConstructor();
 			} else {
 				foundedCtor = defaultCtor;
-
 			}
+
+			if (foundedCtor == null) {
+				// no matching ctor found
+				// still this is not an error if bean is already instantiated.
+				return CtorInjectionPoint.EMPTY;
+			}
+
 			references = referencesResolver.readAllReferencesFromAnnotation(foundedCtor);
 
 			if (references == null) {
 				references = new BeanReferences[0];
 			}
-		}
-
-		if (foundedCtor == null) {
-			throw new PetiteException("No constructor (annotated, single or default) founded as injection point for: " + type.getName());
 		}
 
 		return new CtorInjectionPoint(foundedCtor, references);

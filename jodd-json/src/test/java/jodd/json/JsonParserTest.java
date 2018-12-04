@@ -73,7 +73,7 @@ class JsonParserTest {
 
 	@AfterEach
 	void tearDown() {
-		JoddJson.defaults().setClassMetadataName(null);
+		JsonParser.Defaults.classMetadataName = null;
 	}
 
 	@Test
@@ -560,7 +560,7 @@ class JsonParserTest {
 
 	@Test
 	void testComplexObject() {
-		JoddJson.defaults().setClassMetadataName("class");
+		JsonParser.Defaults.classMetadataName = "class";
 
 		JsonParsers.forEachParser(jsonParser -> {
 			String json = null;
@@ -728,7 +728,7 @@ class JsonParserTest {
 
 			assertEquals("12\n3", jsonParser.parse("\"" + "12\\n3" + "\""));
 
-			String big = RandomString.getInstance().randomAlpha(510);
+			String big = RandomString.get().randomAlpha(510);
 
 			String jbig = big + "\\n";
 			String rbig = big + "\n";
@@ -903,6 +903,21 @@ class JsonParserTest {
 			assertEquals("field2", entries.get(1).getKey());
 			assertEquals("field3", entries.get(2).getKey());
 			assertEquals("field4", entries.get(3).getKey());
+		});
+	}
+
+	@Test
+	void testLazyParserSupportEscapedDoubleQuotes() {
+		String json = "{ \"values\": [{ \"value\": \"foo\\\"bar\" }]}";
+
+		JsonParsers.forEachParser(jsonParser -> {
+			Map<String, Object> object = jsonParser.parse(json);
+
+			List<Map.Entry<String, Object>> entries = object.entrySet().stream().collect(Collectors.toList());
+
+			assertEquals(1, entries.size());
+			assertEquals("values", entries.get(0).getKey());
+			assertEquals("foo\"bar", ((List<Map<String, String>>) entries.get(0).getValue()).get(0).get("value"));
 		});
 	}
 }

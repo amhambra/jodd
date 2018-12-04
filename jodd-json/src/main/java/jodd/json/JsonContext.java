@@ -25,13 +25,14 @@
 
 package jodd.json;
 
-import jodd.bean.JoddBean;
 import jodd.introspector.ClassDescriptor;
+import jodd.introspector.ClassIntrospector;
 import jodd.util.ClassUtil;
 import jodd.util.Wildcard;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 import static jodd.util.StringPool.NULL;
 
@@ -47,13 +48,17 @@ public class JsonContext extends JsonWriter {
 	protected int bagSize = 0;
 	protected final Path path;
 	protected final boolean excludeNulls;
+	protected final boolean excludeEmpty;
+	protected final Function<Object, TypeJsonSerializer> serializerResolver;
 
-	public JsonContext(final JsonSerializer jsonSerializer, final Appendable appendable, final boolean excludeNulls, final boolean strictStringEncoding) {
-		super(appendable, strictStringEncoding);
+	public JsonContext(final JsonSerializer jsonSerializer, final Appendable appendable) {
+		super(appendable, jsonSerializer.strictStringEncoding);
 		this.jsonSerializer = jsonSerializer;
 		this.bag = new ArrayList<>();
 		this.path = new Path();
-		this.excludeNulls = excludeNulls;
+		this.excludeNulls = jsonSerializer.excludeNulls;
+		this.excludeEmpty = jsonSerializer.excludeEmpty;
+		this.serializerResolver = jsonSerializer.serializerResolver;
 	}
 
 	/**
@@ -64,10 +69,14 @@ public class JsonContext extends JsonWriter {
 	}
 
 	/**
-	 * Returns <code>true</code> if null values have to be excluded.
+	 * Returns <code>true</code> if <code>null</code> values have to be excluded.
 	 */
 	public boolean isExcludeNulls() {
 		return excludeNulls;
+	}
+
+	public boolean isExcludeEmpty() {
+		return excludeEmpty;
 	}
 
 	// ---------------------------------------------------------------- path and value context
@@ -172,24 +181,33 @@ public class JsonContext extends JsonWriter {
 
 		TypeJsonSerializer typeJsonSerializer = null;
 
-		// + read paths map
+		// callback
 
-		if (jsonSerializer.pathSerializersMap != null) {
-			typeJsonSerializer = jsonSerializer.pathSerializersMap.get(path);
+		if (serializerResolver != null) {
+			typeJsonSerializer = serializerResolver.apply(object);
 		}
-
-		Class type = object.getClass();
-
-		// + read types map
-
-		if (jsonSerializer.typeSerializersMap != null) {
-			typeJsonSerializer = jsonSerializer.typeSerializersMap.lookup(type);
-		}
-
-		// + globals
 
 		if (typeJsonSerializer == null) {
-			typeJsonSerializer = TypeJsonSerializerMap.get().lookup(type);
+
+			// + read paths map
+
+			if (jsonSerializer.pathSerializersMap != null) {
+				typeJsonSerializer = jsonSerializer.pathSerializersMap.get(path);
+			}
+
+			final Class type = object.getClass();
+
+			// + read local types map
+
+			if (jsonSerializer.typeSerializersMap != null) {
+				typeJsonSerializer = jsonSerializer.typeSerializersMap.lookup(type);
+			}
+
+			// + globals
+
+			if (typeJsonSerializer == null) {
+				typeJsonSerializer = TypeJsonSerializerMap.get().lookup(type);
+			}
 		}
 
 		return typeJsonSerializer.serialize(this, object);
@@ -207,7 +225,7 @@ public class JsonContext extends JsonWriter {
 
 		if (propertyType != null) {
 			if (!jsonSerializer.deep) {
-				ClassDescriptor propertyTypeClassDescriptor = JoddBean.defaults().getClassIntrospector().lookup(propertyType);
+				ClassDescriptor propertyTypeClassDescriptor = ClassIntrospector.get().lookup(propertyType);
 
 				if (propertyTypeClassDescriptor.isArray()) {
 					return false;
@@ -226,13 +244,6 @@ public class JsonContext extends JsonWriter {
 
 			// + excluded types
 
-			if (JoddJson.defaults().getExcludedTypes() != null) {
-				for (Class excludedType : JoddJson.defaults().getExcludedTypes()) {
-					if (ClassUtil.isTypeOf(propertyType, excludedType)) {
-						return false;
-					}
-				}
-			}
 			if (jsonSerializer.excludedTypes != null) {
 				for (Class excludedType : jsonSerializer.excludedTypes) {
 					if (ClassUtil.isTypeOf(propertyType, excludedType)) {
@@ -243,15 +254,8 @@ public class JsonContext extends JsonWriter {
 
 			// + exclude type names
 
-			String propertyTypeName = propertyType.getName();
+			final String propertyTypeName = propertyType.getName();
 
-			if (JoddJson.defaults().getExcludedTypeNames() != null) {
-				for (String excludedTypeName : JoddJson.defaults().getExcludedTypeNames()) {
-					if (Wildcard.match(propertyTypeName, excludedTypeName)) {
-						return false;
-					}
-				}
-			}
 			if (jsonSerializer.excludedTypeNames != null) {
 				for (String excludedTypeName : jsonSerializer.excludedTypeNames) {
 					if (Wildcard.match(propertyTypeName, excludedTypeName)) {

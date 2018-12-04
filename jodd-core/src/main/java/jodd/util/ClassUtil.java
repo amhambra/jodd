@@ -26,7 +26,7 @@
 package jodd.util;
 
 import jodd.util.cl.ClassLoaderStrategy;
-import jodd.util.net.URLDecoder;
+import jodd.net.URLDecoder;
 
 import java.io.File;
 import java.io.IOException;
@@ -199,7 +199,7 @@ public class ClassUtil {
 		Set<Class> bag = new LinkedHashSet<>();
 		_resolveAllInterfaces(type, bag);
 
-		return bag.toArray(new Class[bag.size()]);
+		return bag.toArray(new Class[0]);
 	}
 
 	private static void _resolveAllInterfaces(final Class type, final Set<Class> bag) {
@@ -242,7 +242,7 @@ public class ClassUtil {
 			list.add(type);
 		}
 
-		return list.toArray(new Class[list.size()]);
+		return list.toArray(new Class[0]);
 	}
 
 	// ---------------------------------------------------------------- accessible methods
@@ -414,7 +414,7 @@ public class ClassUtil {
 				}
 			}
 		}
-		return supportedMethods.toArray(new Method[supportedMethods.size()]);
+		return supportedMethods.toArray(new Method[0]);
 	}
 
 
@@ -439,7 +439,7 @@ public class ClassUtil {
 				}
 			}
 		}
-		return supportedFields.toArray(new Field[supportedFields.size()]);
+		return supportedFields.toArray(new Field[0]);
 	}
 
 
@@ -1305,7 +1305,7 @@ public class ClassUtil {
 		}
 	}
 
-	// ---------------------------------------------------------------- misc
+	// ---------------------------------------------------------------- class names
 
 	/**
 	 * Resolves class file name from class name by replacing dot's with '/' separator
@@ -1325,6 +1325,49 @@ public class ClassUtil {
 		return className.replace('.', '/') + ".class";
 	}
 
+	/**
+	 * Returns short class name: packages are replaces with single letter.
+	 */
+	public static String getShortClassName(final Class clazz) {
+		return getShortClassName(clazz, 1);
+	}
+	public static String getShortClassName(final Class clazz, final int shortUpTo) {
+		final String[] chunks = StringUtil.splitc(clazz.getName(), '.');
+		final StringBand stringBand = new StringBand(chunks.length);
+		int ndx = chunks.length - shortUpTo;
+		if (ndx < 0) {
+			ndx = 0;
+		}
 
+		for (int i = 0; i < ndx; i++) {
+			if (i > 0) {
+				stringBand.append('.');
+			}
+			stringBand.append(chunks[i].charAt(0));
+		}
+
+		for (int i = ndx; i < chunks.length; i++) {
+			if (i > 0) {
+				stringBand.append('.');
+			}
+			stringBand.append(chunks[i]);
+		}
+		return stringBand.toString();
+	}
+
+	// ---------------------------------------------------------------- kotlin
+
+	/**
+	 * Returns {@code true} if type is a Kotlin class.
+	 */
+	public static boolean isKotlinClass(final Class type) {
+		final Annotation[] annotations = type.getAnnotations();
+		for (Annotation annotation : annotations) {
+			if (annotation.annotationType().getName().equals("kotlin.Metadata")) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 }

@@ -25,7 +25,8 @@
 
 package jodd.madvoc.meta;
 
-import jodd.madvoc.ScopeType;
+import jodd.madvoc.scope.MadvocScope;
+import jodd.madvoc.scope.RequestScope;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -34,15 +35,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * The scope for {@link In}/{@link Out}.
+ * The scope of {@link jodd.madvoc.config.InjectionPoint}.
  */
 @Documented
 @Retention(value = RetentionPolicy.RUNTIME)
-@Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
 public @interface Scope {
 	/**
-	 * Specifies parameter scope.
+	 * Scope type.
 	 */
-	ScopeType value() default ScopeType.REQUEST;
+	Class<? extends MadvocScope> value() default RequestScope.class;
 
 }

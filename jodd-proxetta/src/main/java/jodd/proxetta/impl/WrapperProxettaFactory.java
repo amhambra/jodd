@@ -25,10 +25,10 @@
 
 package jodd.proxetta.impl;
 
-import jodd.asm6.ClassReader;
-import jodd.proxetta.JoddProxetta;
+import jodd.asm7.ClassReader;
 import jodd.proxetta.ProxettaException;
 import jodd.proxetta.ProxettaFactory;
+import jodd.proxetta.ProxettaNames;
 import jodd.proxetta.ProxettaUtil;
 import jodd.proxetta.ProxyAspect;
 import jodd.proxetta.asm.ProxettaWrapperClassBuilder;
@@ -40,13 +40,16 @@ import jodd.proxetta.asm.WorkData;
  */
 public class WrapperProxettaFactory extends ProxettaFactory<WrapperProxettaFactory, WrapperProxetta> {
 
+	private final boolean createTargetInDefaultCtor;
+
 	public WrapperProxettaFactory(final WrapperProxetta wrapperProxetta) {
 		super(wrapperProxetta);
+		this.createTargetInDefaultCtor = wrapperProxetta.createTargetInDefaultCtor;
 	}
 
 	protected Class targetClassOrInterface;
 	protected Class targetInterface;
-	protected String targetFieldName = JoddProxetta.defaults().getWrapperTargetFieldName();
+	protected String targetFieldName = ProxettaNames.wrapperTargetFieldName;
 
 	/**
 	 * Defines class or interface to wrap.
@@ -84,7 +87,7 @@ public class WrapperProxettaFactory extends ProxettaFactory<WrapperProxettaFacto
 	 */
 	@Override
 	protected WorkData process(final ClassReader cr, final TargetClassInfoReader targetClassInfoReader) {
-		ProxettaWrapperClassBuilder pcb =
+		final ProxettaWrapperClassBuilder pcb =
 				new ProxettaWrapperClassBuilder(
 						targetClassOrInterface,
 						targetInterface,
@@ -93,7 +96,9 @@ public class WrapperProxettaFactory extends ProxettaFactory<WrapperProxettaFacto
 						proxetta.getAspects(new ProxyAspect[0]),
 						resolveClassNameSuffix(),
 						requestedProxyClassName,
-						targetClassInfoReader);
+						targetClassInfoReader,
+						createTargetInDefaultCtor
+				);
 
 		cr.accept(pcb, 0);
 

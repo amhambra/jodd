@@ -46,7 +46,7 @@ public class HttpBrowser {
 	protected boolean catchTransportExceptions = true;
 
 	public HttpBrowser() {
-		httpConnectionProvider = JoddHttp.defaults().getHttpConnectionProvider();
+		httpConnectionProvider = HttpConnectionProvider.get();
 	}
 
 	/**
@@ -293,7 +293,7 @@ public class HttpBrowser {
 				cookiesList.add(cookieEntry.getValue());
 			}
 
-			httpRequest.cookies(cookiesList.toArray(new Cookie[cookiesList.size()]));
+			httpRequest.cookies(cookiesList.toArray(new Cookie[0]));
 		}
 	}
 }

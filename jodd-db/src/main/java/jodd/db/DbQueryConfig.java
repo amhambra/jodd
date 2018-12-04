@@ -26,61 +26,77 @@
 package jodd.db;
 
 /**
- * Default configuration of a query.
+ * Db query default configuration.
  */
 public class DbQueryConfig {
 
-	protected boolean forcePreparedStatement = false;
-	protected int type = DbQuery.TYPE_FORWARD_ONLY;
-	protected int concurrencyType = DbQuery.CONCUR_READ_ONLY;
-	protected int holdability = DbQuery.DEFAULT_HOLDABILITY;
-	protected int fetchSize = 0;
-	protected int maxRows = 0;
+	/**
+	 * Default debug mode.
+	 */
+	private boolean debug = false;
+	/**
+	 * Enables creation of prepared statements for all queries.
+	 */
+	private boolean forcePreparedStatement = false;
+	/**
+	 * Default type.
+	 */
+	private QueryScrollType type = QueryScrollType.FORWARD_ONLY;
+	/**
+	 * Default concurrency type.
+	 */
+	private QueryConcurrencyType concurrencyType = QueryConcurrencyType.READ_ONLY;
+	/**
+	 * Default holdability.
+	 */
+	private QueryHoldability holdability = QueryHoldability.DEFAULT;
+	/**
+	 * Default value for fetch size.
+	 */
+	private int fetchSize = 0;
+	/**
+	 * Default value for max rows.
+	 */
+	private int maxRows = 0;
+
+
+	public boolean isDebug() {
+		return debug;
+	}
+
+	public void setDebug(final boolean debug) {
+		this.debug = debug;
+	}
 
 	public boolean isForcePreparedStatement() {
 		return forcePreparedStatement;
 	}
 
-	/**
-	 * Enables creation of prepared statements for all queries.
-	 */
 	public void setForcePreparedStatement(final boolean forcePreparedStatement) {
 		this.forcePreparedStatement = forcePreparedStatement;
 	}
 
-	public int getType() {
+	public QueryScrollType getType() {
 		return type;
 	}
 
-	/**
-	 * Sets default type.
-	 * @see DbQuery#setType(int)
-	 */
-	public void setType(final int type) {
+	public void setType(final QueryScrollType type) {
 		this.type = type;
 	}
 
-	public int getConcurrencyType() {
+	public QueryConcurrencyType getConcurrencyType() {
 		return concurrencyType;
 	}
 
-	/**
-	 * Sets default concurrency type.
-	 * @see DbQuery#setConcurrencyType(int)
-	 */
-	public void setConcurrencyType(final int concurrencyType) {
+	public void setConcurrencyType(final QueryConcurrencyType concurrencyType) {
 		this.concurrencyType = concurrencyType;
 	}
 
-	public int getHoldability() {
+	public QueryHoldability getHoldability() {
 		return holdability;
 	}
 
-	/**
-	 * Sets default holdability.
-	 * @see DbQuery#setHoldability(int)
-	 */
-	public void setHoldability(final int holdability) {
+	public void setHoldability(final QueryHoldability holdability) {
 		this.holdability = holdability;
 	}
 
@@ -88,27 +104,15 @@ public class DbQueryConfig {
 		return fetchSize;
 	}
 
-	/**
-	 * Sets default value for fetch size.
-	 * @see DbQuery#setFetchSize(int)
-	 */
 	public void setFetchSize(final int fetchSize) {
 		this.fetchSize = fetchSize;
 	}
 
-	/**
-	 * Returns default value for max rows.
-	 */
 	public int getMaxRows() {
 		return maxRows;
 	}
 
-	/**
-	 * Sets default value for max rows.
-	 * @see DbQuery#setMaxRows(int)
-	 */
 	public void setMaxRows(final int maxRows) {
 		this.maxRows = maxRows;
 	}
-
 }

@@ -41,9 +41,7 @@ import java.util.List;
  */
 public class InitMethodResolver {
 
-	public InitMethodPoint[] resolve(final Object bean) {
-		Class<?> type = bean.getClass();
-
+	public InitMethodPoint[] resolve(final Class<?> type) {
 		// lookup methods
 		List<InitMethodPoint> list = new ArrayList<>();
 		ClassDescriptor cd = new ClassDescriptor(type, false, false, false, null);
@@ -69,7 +67,7 @@ public class InitMethodResolver {
 			methods = InitMethodPoint.EMPTY;
 		} else {
 			Collections.sort(list);
-			methods = list.toArray(new InitMethodPoint[list.size()]);
+			methods = list.toArray(new InitMethodPoint[0]);
 		}
 
 		return methods;

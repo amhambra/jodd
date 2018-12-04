@@ -25,11 +25,10 @@
 
 package jodd.madvoc.component;
 
-import jodd.bean.JoddBean;
+import jodd.introspector.ClassIntrospector;
 import jodd.introspector.MethodDescriptor;
 import jodd.log.Logger;
 import jodd.log.LoggerFactory;
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocException;
 import jodd.madvoc.config.ActionDefinition;
 import jodd.madvoc.config.ActionRuntime;
@@ -48,15 +47,12 @@ import static jodd.util.StringUtil.ifNotNull;
 /**
  * Manages all Madvoc action and aliases registrations.
  */
-public class ActionsManager {
+public class ActionsManager extends ActionsManagerCfg {
 
 	private static final Logger log = LoggerFactory.getLogger(ActionsManager.class);
 
 	@PetiteInject
 	protected ActionMethodParser actionMethodParser;
-
-	@PetiteInject
-	protected MadvocConfig madvocConfig;
 
 	protected int actionsCount;
 	protected boolean asyncMode;
@@ -66,7 +62,7 @@ public class ActionsManager {
 	protected Map<String, String> pathAliases;					// path aliases
 
 	public ActionsManager() {
-		this.routes = new Routes(() -> madvocConfig);
+		this.routes = new Routes(this);
 
 		this.pathAliases = new HashMap<>();
 		this.runtimes = new HashMap<>();
@@ -79,11 +75,11 @@ public class ActionsManager {
 	 * with and without the macro.
 	 */
 	public List<ActionRuntime> getAllActionRuntimes() {
-		List<ActionRuntime> all = new ArrayList<>(actionsCount);
+		return new ArrayList<>(runtimes.values());
+	}
 
-		all.addAll(runtimes.values());
-
-		return all;
+	public Map<String, String> getAllAliases() {
+		return new HashMap<>(pathAliases);
 	}
 
 	/**
@@ -107,7 +103,7 @@ public class ActionsManager {
 	 * Resolves action method for given action class ane method name.
 	 */
 	public Method resolveActionMethod(final Class<?> actionClass, final String methodName) {
-		MethodDescriptor methodDescriptor = JoddBean.defaults().getClassIntrospector().lookup(actionClass).getMethodDescriptor(methodName, false);
+		MethodDescriptor methodDescriptor = ClassIntrospector.get().lookup(actionClass).getMethodDescriptor(methodName, false);
 		if (methodDescriptor == null) {
 			throw new MadvocException("Public method not found: " + actionClass.getSimpleName() + "#" + methodName);
 		}
@@ -156,8 +152,8 @@ public class ActionsManager {
 
 		if (routeChunk.value() != null) {
 			// existing chunk
-			if (madvocConfig.isDetectDuplicatePathsEnabled()) {
-				throw new MadvocException("Duplicate action path for " + actionRuntime);
+			if (detectDuplicatePathsEnabled) {
+				throw new MadvocException("Duplicate action path for [" + actionRuntime + "] occupied by: [" + routeChunk.value() + "]");
 			}
 		}
 		else {
@@ -199,7 +195,10 @@ public class ActionsManager {
 	 * Registers new path alias.
 	 */
 	public void registerPathAlias(final String alias, final String path) {
-		pathAliases.put(alias, path);
+		final String existing = pathAliases.put(alias, path);
+		if (existing != null) {
+			throw new MadvocException("Duplicated alias detected: [" + alias + "] for paths: " + path + ", " + existing);
+		}
 	}
 
 	/**

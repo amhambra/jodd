@@ -37,6 +37,7 @@ import javax.mail.Part;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimePart;
 import javax.mail.util.ByteArrayDataSource;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -50,6 +51,7 @@ import java.util.List;
 public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 
 	public static final ReceivedEmail[] EMPTY_ARRAY = new ReceivedEmail[0];
+	private File attachmentStorage;
 
 	/**
 	 * Static constructor for fluent interface.
@@ -63,11 +65,15 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	@Override
 	public ReceivedEmail clone() {
 		return create()
+			//original message
+			.originalMessage(originalMessage())
+
 			// flags
 			.flags(flags())
 
-			// message number
+			// message number and id
 			.messageNumber(messageNumber())
+			.messageId(messageId())
 
 			// from / reply-to
 			.from(from())
@@ -103,10 +109,13 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	 * Creates a {@link ReceivedEmail} from a given {@link Message}.
 	 *
 	 * @param msg {@link Message}
+	 * @param envelope flag if this is an envelope
 	 */
-	public ReceivedEmail(final Message msg) {
+	public ReceivedEmail(final Message msg, final boolean envelope, final File attachmentStorage) {
+		this.attachmentStorage = attachmentStorage;
+		this.originalMessage = msg;
 		try {
-			parseMessage(msg);
+			parseMessage(msg, envelope);
 		} catch (final Exception ex) {
 			throw new MailException("Message parsing failed", ex);
 		}
@@ -119,12 +128,17 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	 * @throws IOException        if there is an error with the content
 	 * @throws MessagingException if there is an error.
 	 */
-	protected void parseMessage(final Message msg) throws MessagingException, IOException {
+	protected void parseMessage(final Message msg, final boolean envelope) throws MessagingException, IOException {
 		// flags
 		flags(msg.getFlags());
 
 		// message number
 		messageNumber(msg.getMessageNumber());
+
+		if (msg instanceof MimeMessage) {
+			messageId(((MimeMessage) msg).getMessageID());
+		}
+
 
 		// single from
 		final Address[] addresses = msg.getFrom();
@@ -152,8 +166,11 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 		headers(msg.getAllHeaders());
 
 		// content
-		processPart(msg);
+		if (!envelope) {
+			processPart(msg);
+		}
 	}
+
 
 	/**
 	 * Process part of the received message. All parts are simply added to the {@link ReceivedEmail},
@@ -171,12 +188,12 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 		} else if (content instanceof Multipart) {
 			processMultipart((Multipart) content);
 		} else if (content instanceof InputStream) {
-			addAttachment(part, (InputStream) content);
+			addAttachment(part, (InputStream) content, attachmentStorage);
 		} else if (content instanceof MimeMessage) {
 			final MimeMessage mimeMessage = (MimeMessage) content;
-			attachedMessage(new ReceivedEmail(mimeMessage));
+			attachedMessage(new ReceivedEmail(mimeMessage, false, attachmentStorage));
 		} else {
-			addAttachment(part, part.getInputStream());
+			addAttachment(part, part.getInputStream(), attachmentStorage);
 		}
 	}
 
@@ -248,6 +265,30 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 			return dispositionId != null && dispositionId.equalsIgnoreCase("inline");
 		}
 		return false;
+	}
+
+	// ---------------------------------------------------------------- original message
+
+	/**
+	 * {@link Message} for this {@link ReceivedEmail}.
+	 */
+	private Message originalMessage;
+
+	/**
+	 * @return {@link Message}
+	 */
+	public Message originalMessage() {
+		return originalMessage;
+	}
+
+	/**
+	 * Sets the original message.
+	 *
+	 * @param originalMessage {@link Message} to set.
+	 */
+	public ReceivedEmail originalMessage(final Message originalMessage) {
+		this.originalMessage = originalMessage;
+		return this;
 	}
 
 	// ---------------------------------------------------------------- flags
@@ -329,6 +370,7 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	// ---------------------------------------------------------------- additional properties
 
 	private int messageNumber;
+	private String messageId;
 
 	/**
 	 * Returns message number.
@@ -340,6 +382,13 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	}
 
 	/**
+	 * Returns message ID if set by server.
+	 */
+	public String messageId() {
+		return messageId;
+	}
+
+	/**
 	 * Sets message number.
 	 *
 	 * @param messageNumber The message number to set.
@@ -347,6 +396,14 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	 */
 	public ReceivedEmail messageNumber(final int messageNumber) {
 		this.messageNumber = messageNumber;
+		return this;
+	}
+
+	/**
+	 * Sets message ID.
+	 */
+	public ReceivedEmail messageId(final String messageId) {
+		this.messageId = messageId;
 		return this;
 	}
 
@@ -382,9 +439,13 @@ public class ReceivedEmail extends CommonEmail<ReceivedEmail> {
 	 * @return this
 	 * @see #attachment(EmailAttachment)
 	 */
-	private ReceivedEmail addAttachment(final Part part, final InputStream content) throws MessagingException, IOException {
+	private ReceivedEmail addAttachment(final Part part, final InputStream content, final File attachmentStorage) throws MessagingException, IOException {
 		final EmailAttachmentBuilder builder = addAttachmentInfo(part);
 		builder.content(content, part.getContentType());
+		if (attachmentStorage != null) {
+			String name = messageId + "-" + (this.attachments().size() + 1);
+			return storeAttachment(builder.buildFileDataSource(name, attachmentStorage));
+		}
 		return storeAttachment(builder.buildByteArrayDataSource());
 	}
 

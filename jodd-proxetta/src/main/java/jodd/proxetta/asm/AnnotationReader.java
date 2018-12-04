@@ -27,7 +27,7 @@ package jodd.proxetta.asm;
 
 import jodd.asm.AsmUtil;
 import jodd.asm.EmptyAnnotationVisitor;
-import jodd.asm6.AnnotationVisitor;
+import jodd.asm7.AnnotationVisitor;
 import jodd.proxetta.AnnotationInfo;
 
 import java.util.ArrayList;
@@ -116,7 +116,7 @@ public class AnnotationReader extends EmptyAnnotationVisitor implements Annotati
 
 			@Override
 			public void visitEnd() {
-				Object[] data = array.toArray(new Object[array.size()]);
+				Object[] data = array.toArray(new Object[0]);
 				elements.put(name, data);
 			}
 		};

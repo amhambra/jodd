@@ -25,19 +25,20 @@
 
 package jodd.madvoc.action;
 
-import jodd.madvoc.ScopeType;
 import jodd.madvoc.meta.Action;
 import jodd.madvoc.meta.In;
 import jodd.madvoc.meta.MadvocAction;
 import jodd.madvoc.meta.Out;
-import jodd.madvoc.meta.Scope;
+import jodd.madvoc.meta.scope.Body;
+import jodd.madvoc.result.Chain;
+import jodd.madvoc.result.NoResult;
 import jodd.mutable.MutableInteger;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @MadvocAction
 public class HelloAction {
@@ -88,7 +89,7 @@ public class HelloAction {
 
 	// ----------------------------------------------------------------
 
-	@In @Scope(ScopeType.SERVLET)
+	@In
 	HttpServletResponse servletResponse;
 
 	/**
@@ -96,20 +97,14 @@ public class HelloAction {
 	 * No result.
 	 */
 	@Action
-	public String direct() throws IOException {
+	public NoResult direct() throws IOException {
 		servletResponse.getWriter().print("Direct stream output");
-		return "none:";
+		return NoResult.value();
 	}
-
-	@In @Scope(ScopeType.SERVLET)
-	Map<String, String> requestParamMap;
-
-	@In @Scope(ScopeType.SERVLET)
-	String requestMethod;
 
 	@Out
 	public String getReqMethod() {
-		return requestMethod;
+		return servletRequest.getMethod();
 	}
 
 	static class ReqReqOut {
@@ -117,7 +112,10 @@ public class HelloAction {
 		public String name;
 	}
 
-	@In @Scope(ScopeType.SERVLET)
+	@In
+	HttpServletRequest servletRequest;
+
+	@In @Body
 	String requestBody;
 
 	@Out
@@ -127,7 +125,7 @@ public class HelloAction {
 
 	@Action
 	public void reqreq(ReqReqOut reqReqOut) {
-		String hey = requestParamMap.get("hey");
+		String hey = servletRequest.getParameter("hey");
 
 		reqReqOut.name = hey;
 	}
@@ -146,9 +144,9 @@ public class HelloAction {
 	int chain;
 
 	@Action
-	public String chain() {
+	public Chain chain() {
 		chain++;
-		return "chain:/hello.link.html";
+		return Chain.to("/hello.link.html");
 	}
 
 	@Action

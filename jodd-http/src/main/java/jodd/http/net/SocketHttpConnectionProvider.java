@@ -29,7 +29,6 @@ import jodd.http.HttpConnection;
 import jodd.http.HttpConnectionProvider;
 import jodd.http.HttpException;
 import jodd.http.HttpRequest;
-import jodd.http.JoddHttp;
 import jodd.http.ProxyInfo;
 import jodd.util.StringUtil;
 
@@ -50,6 +49,8 @@ import java.security.NoSuchAlgorithmException;
 public class SocketHttpConnectionProvider implements HttpConnectionProvider {
 
 	protected ProxyInfo proxy = ProxyInfo.directProxy();
+	protected String secureEnabledProtocols = System.getProperty("https.protocols");
+	protected String sslProtocol = "TLSv1.1";
 
 	/**
 	 * Defines proxy to use for created sockets.
@@ -60,13 +61,36 @@ public class SocketHttpConnectionProvider implements HttpConnectionProvider {
 	}
 
 	/**
+	 * CSV of default enabled secured protocols. By default the value is
+	 * read from system property <code>https.protocols</code>.
+	 */
+	public void setSecuredProtocols(final String secureEnabledProtocols) {
+		this.secureEnabledProtocols = secureEnabledProtocols;
+	}
+
+	/**
+	 * Returns current SSL protocol used.
+	 */
+	public String getSslProtocol() {
+		return sslProtocol;
+	}
+
+	/**
+	 * Sets default SSL protocol to use. One of "SSL", "TLSv1.2", "TLSv1.1", "TLSv1".
+	 */
+	public SocketHttpConnectionProvider setSslProtocol(final String sslProtocol) {
+		this.sslProtocol = sslProtocol;
+		return this;
+	}
+
+	/**
 	 * Creates new connection from current {@link jodd.http.HttpRequest request}.
 	 *
 	 * @see #createSocket(String, int, int)
 	 */
 	@Override
 	public HttpConnection createHttpConnection(final HttpRequest httpRequest) throws IOException {
-		SocketHttpConnection httpConnection;
+		final SocketHttpConnection httpConnection;
 
 		final boolean https = httpRequest.protocol().equalsIgnoreCase("https");
 
@@ -180,10 +204,8 @@ public class SocketHttpConnectionProvider implements HttpConnectionProvider {
 
 		// sslSocket is now ready
 
-		String enabledProtocols = JoddHttp.defaults().getSecureEnabledProtocols();
-
-		if (enabledProtocols != null) {
-			String[] values = StringUtil.splitc(enabledProtocols, ',');
+		if (secureEnabledProtocols != null) {
+			final String[] values = StringUtil.splitc(secureEnabledProtocols, ',');
 
 			StringUtil.trimAll(values);
 
@@ -193,7 +215,7 @@ public class SocketHttpConnectionProvider implements HttpConnectionProvider {
 		// set SSL parameters to allow host name verifier
 
 		if (verifyHttpsHost) {
-			SSLParameters sslParams = new SSLParameters();
+			final SSLParameters sslParams = new SSLParameters();
 
 			sslParams.setEndpointIdentificationAlgorithm("HTTPS");
 
@@ -209,7 +231,7 @@ public class SocketHttpConnectionProvider implements HttpConnectionProvider {
 	protected SSLSocketFactory getDefaultSSLSocketFactory(final boolean trustAllCertificates) throws IOException {
 		if (trustAllCertificates) {
 			try {
-				SSLContext sc = SSLContext.getInstance("SSL");
+				SSLContext sc = SSLContext.getInstance(sslProtocol);
 				sc.init(null, TrustManagers.TRUST_ALL_CERTS, new java.security.SecureRandom());
 				return sc.getSocketFactory();
 			}

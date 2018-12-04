@@ -33,6 +33,7 @@ import jodd.db.oom.naming.ColumnNamingStrategy;
 import jodd.db.oom.naming.TableNamingStrategy;
 import jodd.db.type.SqlType;
 import jodd.introspector.PropertyDescriptor;
+import jodd.util.StringUtil;
 
 /**
  * Meta-data resolving utils.
@@ -47,7 +48,7 @@ public class DbMetaUtil {
 	 */
 	public static String resolveTableName(final Class<?> type, final TableNamingStrategy tableNamingStrategy) {
 		String tableName = null;
-		DbTable dbTable = type.getAnnotation(DbTable.class);
+		final DbTable dbTable = type.getAnnotation(DbTable.class);
 		if (dbTable != null) {
 			tableName = dbTable.value().trim();
 		}
@@ -58,7 +59,8 @@ public class DbMetaUtil {
 				tableName = tableNamingStrategy.applyToTableName(tableName);
 			}
 		}
-		return tableName;
+
+		return quoteIfRequired(tableName, tableNamingStrategy.isAlwaysQuoteNames(), tableNamingStrategy.getQuoteChar());
 	}
 
 	/**
@@ -66,7 +68,7 @@ public class DbMetaUtil {
 	 */
 	public static String resolveSchemaName(final Class<?> type, final String defaultSchemaName) {
 		String schemaName = null;
-		DbTable dbTable = type.getAnnotation(DbTable.class);
+		final DbTable dbTable = type.getAnnotation(DbTable.class);
 		if (dbTable != null) {
 			schemaName = dbTable.schema().trim();
 		}
@@ -140,7 +142,8 @@ public class DbMetaUtil {
 			}
 		}
 
-		if ((columnName == null) || (columnName.length() == 0)) {
+		if (StringUtil.isEmpty(columnName)) {
+			// default annotation value
 			columnName = columnNamingStrategy.convertPropertyNameToColumnName(property.getName());
 		} else {
 			if (!columnNamingStrategy.isStrictAnnotationNames()) {
@@ -152,7 +155,12 @@ public class DbMetaUtil {
 		}
 
 		return new DbEntityColumnDescriptor(
-				dbEntityDescriptor, columnName, property.getName(), property.getType(), isId, sqlTypeClass);
+			dbEntityDescriptor,
+			quoteIfRequired(columnName, columnNamingStrategy.isAlwaysQuoteNames(), columnNamingStrategy.getQuoteChar()),
+			property.getName(),
+			property.getType(),
+			isId,
+			sqlTypeClass);
 	}
 
 	/**
@@ -165,4 +173,17 @@ public class DbMetaUtil {
 		}
 		return dbMapTo.value();
 	}
+
+	// ---------------------------------------------------------------- privates
+
+	private static String quoteIfRequired(final String name, final boolean alwaysQuoteNames, final char quoteChar) {
+		if (StringUtil.detectQuoteChar(name) != 0) {
+			return name;   // already quoted
+		}
+		if (alwaysQuoteNames && quoteChar != 0) {
+			return quoteChar + name + quoteChar;
+		}
+		return name;
+	}
+
 }

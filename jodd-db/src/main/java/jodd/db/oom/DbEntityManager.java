@@ -25,7 +25,7 @@
 
 package jodd.db.oom;
 
-import jodd.db.JoddDb;
+import jodd.cache.TypeCache;
 import jodd.db.oom.naming.ColumnNamingStrategy;
 import jodd.db.oom.naming.TableNamingStrategy;
 import jodd.log.Logger;
@@ -35,6 +35,7 @@ import jodd.util.StringUtil;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * DbOom Entity manager.
@@ -49,6 +50,12 @@ import java.util.Map;
 public class DbEntityManager {
 
 	private static final Logger log = LoggerFactory.getLogger(DbEntityManager.class);
+
+	private final DbOomConfig dbOomConfig;
+
+	public DbEntityManager(final DbOomConfig dbOomConfig) {
+		this.dbOomConfig = dbOomConfig;
+	}
 
 	// ---------------------------------------------------------------- registration
 
@@ -74,7 +81,7 @@ public class DbEntityManager {
 		this.primitiveEntitiesPrefixes = primitiveEntitiesPrefixes;
 	}
 
-	protected Map<Class, DbEntityDescriptor> descriptorsMap = new HashMap<>();
+	protected TypeCache<DbEntityDescriptor> descriptorsMap = TypeCache.createDefault();
 	protected Map<String, DbEntityDescriptor> entityNamesMap = new HashMap<>();
 	protected Map<String, DbEntityDescriptor> tableNamesMap = new NamedValuesHashMap<>();
 
@@ -95,13 +102,6 @@ public class DbEntityManager {
 			ded = registerType(type);
 		}
 		return ded;
-	}
-
-	/**
-	 * Returns <code>true</code> if type is registered withing manager.
-	 */
-	public boolean isRegistered(final Class type) {
-		return descriptorsMap.containsKey(type);
 	}
 
 
@@ -190,9 +190,9 @@ public class DbEntityManager {
 	 * Creates {@link DbEntityDescriptor}.
 	 */
 	protected <E> DbEntityDescriptor<E> createDbEntityDescriptor(final Class<E> type) {
-		final String schemaName = JoddDb.defaults().getDbOomConfig().getSchemaName();
-		final TableNamingStrategy tableNames = JoddDb.defaults().getDbOomConfig().getTableNames();
-		final ColumnNamingStrategy columnNames = JoddDb.defaults().getDbOomConfig().getColumnNames();
+		final String schemaName = dbOomConfig.getSchemaName();
+		final TableNamingStrategy tableNames = dbOomConfig.getTableNames();
+		final ColumnNamingStrategy columnNames = dbOomConfig.getColumnNames();
 
 		return new DbEntityDescriptor<>(type, schemaName, tableNames, columnNames);
 	}
@@ -238,6 +238,10 @@ public class DbEntityManager {
 		} catch (Exception ex) {
 			throw new DbOomException(ex);
 		}
+	}
+
+	public void forEachEntity(final Consumer<DbEntityDescriptor> consumer) {
+		descriptorsMap.forEachValue(consumer);
 	}
 
 }

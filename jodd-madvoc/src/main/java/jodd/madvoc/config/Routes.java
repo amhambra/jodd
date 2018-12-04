@@ -25,14 +25,12 @@
 
 package jodd.madvoc.config;
 
-import jodd.madvoc.MadvocConfig;
 import jodd.madvoc.MadvocException;
+import jodd.madvoc.component.ActionsManager;
 import jodd.madvoc.macro.PathMacros;
 import jodd.util.ClassUtil;
 import jodd.util.StringPool;
 import jodd.util.StringUtil;
-
-import java.util.function.Supplier;
 
 /**
  * Utility that deals with routes and route chunks.
@@ -41,12 +39,12 @@ public class Routes {
 	private static final String ANY_METHOD = StringPool.STAR;
 
 	private final RouteChunk root;
+	private final ActionsManager actionsManager;
 	private RouteChunk anyMethodChunk;
-	private Supplier<MadvocConfig> madvocConfigSupplier;
 
-	public Routes(final Supplier<MadvocConfig> madvocConfigSupplier) {
+	public Routes(final ActionsManager actionsManager) {
 		this.root = new RouteChunk(this, null, StringPool.EMPTY);
-		this.madvocConfigSupplier = madvocConfigSupplier;
+		this.actionsManager = actionsManager;
 	}
 
 	public RouteChunk registerPath(String method, String path) {
@@ -77,16 +75,27 @@ public class Routes {
 
 	public ActionRuntime lookup(final String method, final String[] pathChunks) {
 		while (true) {
-			ActionRuntime actionRuntime = _lookup(method, pathChunks);
+			final ActionRuntime actionRuntime = _lookup(method, pathChunks);
 			if (actionRuntime != null) {
 				return actionRuntime;
 			}
 
+			if (actionsManager.isStrictRoutePaths()) {
+				return null;
+			}
+
+			// special case
 			final String lastPath = pathChunks[pathChunks.length - 1];
 			final int lastNdx = lastPath.lastIndexOf('.');
 			if (lastNdx == -1) {
 				return null;
 			}
+			final String pathExtension = lastPath.substring(lastNdx + 1);
+
+			if (StringUtil.equalsOne(pathExtension, actionsManager.getPathExtensionsToStrip()) == -1) {
+				return null;
+			}
+
 			pathChunks[pathChunks.length - 1] = lastPath.substring(0, lastNdx);
 		}
 	}
@@ -187,7 +196,7 @@ public class Routes {
 
 		PathMacros pathMacros = createPathMacroInstance();
 
-		if (!pathMacros.init(actionPath, madvocConfigSupplier.get().getPathMacroSeparators())) {
+		if (!pathMacros.init(actionPath, actionsManager.getPathMacroSeparators())) {
 			return null;
 		}
 
@@ -199,7 +208,7 @@ public class Routes {
 	 */
 	private PathMacros createPathMacroInstance() {
 		try {
-			return ClassUtil.newInstance(madvocConfigSupplier.get().getPathMacroClass());
+			return ClassUtil.newInstance(actionsManager.getPathMacroClass());
 		} catch (Exception ex) {
 			throw new MadvocException(ex);
 		}

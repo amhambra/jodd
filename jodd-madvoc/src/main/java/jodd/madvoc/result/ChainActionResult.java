@@ -26,10 +26,10 @@
 package jodd.madvoc.result;
 
 import jodd.madvoc.ActionRequest;
-import jodd.madvoc.ScopeType;
 import jodd.madvoc.component.ResultMapper;
 import jodd.madvoc.meta.In;
-import jodd.madvoc.meta.Scope;
+import jodd.madvoc.meta.scope.MadvocContext;
+import jodd.util.StringPool;
 
 /**
  * Process chain results. Chaining is very similar to forwarding, except it is done
@@ -37,19 +37,32 @@ import jodd.madvoc.meta.Scope;
  * happens after the complete execution of current one: after all interceptors and this result has been
  * finished.
  */
-public class ChainActionResult implements ActionResult<Chain> {
+public class ChainActionResult implements ActionResult {
 
-	@In @Scope(ScopeType.CONTEXT)
+	@In @MadvocContext
 	protected ResultMapper resultMapper;
 
 	/**
 	 * Sets the {@link jodd.madvoc.ActionRequest#setNextActionPath(String) next action request} for the chain.
 	 */
 	@Override
-	public void render(final ActionRequest actionRequest, final Chain chainResult) {
-		String resultBasePath = actionRequest.getActionRuntime().getResultBasePath();
+	public void render(final ActionRequest actionRequest, final Object resultValue) {
+		final Chain chainResult;
 
-		String resultPath = resultMapper.resolveResultPathString(resultBasePath, chainResult.path());
+		if (resultValue == null) {
+			chainResult = Chain.to(StringPool.EMPTY);
+		} else {
+			if (resultValue instanceof String) {
+				chainResult = Chain.to((String)resultValue);
+			}
+			else {
+				chainResult = (Chain) resultValue;
+			}
+		}
+
+		final String resultBasePath = actionRequest.getActionRuntime().getResultBasePath();
+
+		final String resultPath = resultMapper.resolveResultPathString(resultBasePath, chainResult.path());
 
 		actionRequest.setNextActionPath(resultPath);
 	}

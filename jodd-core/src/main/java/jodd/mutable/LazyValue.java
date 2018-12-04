@@ -25,7 +25,6 @@
 
 package jodd.mutable;
 
-import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -56,7 +55,7 @@ public class LazyValue<T> implements Supplier<T> {
 		if (!initialized) {
 			synchronized (this) {
 				if (!initialized) {
-					T t = supplier.get();
+					final T t = supplier.get();
 					value = t;
 					initialized = true;
 					supplier = null;
@@ -65,13 +64,6 @@ public class LazyValue<T> implements Supplier<T> {
 			}
 		}
 		return value;
-	}
-
-	/**
-	 * Returns an optional of current value.
-	 */
-	public Optional<T> optional() {
-		return Optional.ofNullable(get());
 	}
 
 }
