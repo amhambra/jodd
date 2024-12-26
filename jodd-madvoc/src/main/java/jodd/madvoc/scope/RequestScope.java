@@ -25,18 +25,19 @@
 
 package jodd.madvoc.scope;
 
-import jodd.io.upload.FileUpload;
+import jodd.http.upload.FileUpload;
 import jodd.madvoc.ActionRequest;
 import jodd.madvoc.component.MadvocEncoding;
 import jodd.madvoc.config.Targets;
 import jodd.petite.meta.PetiteInject;
 import jodd.servlet.ServletUtil;
 import jodd.servlet.upload.MultipartRequestWrapper;
-import jodd.util.StringPool;
 import jodd.util.StringUtil;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 
 /**
@@ -124,7 +125,7 @@ public class RequestScope extends RequestScopeCfg implements MadvocScope {
 								final String p = paramValues[j];
 								if (p != null) {
 									final String encoding = madvocEncoding.getEncoding();
-									paramValues[j] = StringUtil.convertCharset(p, StringPool.ISO_8859_1, encoding);
+									paramValues[j] = StringUtil.convertCharset(p, StandardCharsets.ISO_8859_1, Charset.forName(encoding));
 								}
 							}
 						}

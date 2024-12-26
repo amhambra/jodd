@@ -32,11 +32,6 @@ publishing {
 	publications {
 		mavenJava(MavenPublication) {
 			from components.java
-			afterEvaluate {
-				artifact sourcesJar
-				artifact javadocJar
-			}
-
 			customizePom(pom, project)
 		}
 	}
@@ -103,7 +98,7 @@ def customizePom(pom, gradleProject) {
 			}
 			licenses {
 				license {
-					name 'The BSD 2-Clause License'
+					name 'BSD-2-Clause'
 					url 'http://jodd.org/license.html'
 					distribution 'repo'
 				}

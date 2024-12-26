@@ -43,7 +43,7 @@ import java.util.concurrent.locks.StampedLock;
  */
 public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 
-	class CacheObject<K2,V2> {
+	static class CacheObject<K2,V2> {
 		CacheObject(final K2 key, final V2 object, final long ttl) {
 			this.key = key;
 			this.cachedObject = object;
@@ -66,6 +66,9 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 		V2 getObject() {
 			lastAccess = System.currentTimeMillis();
 			accessCount++;
+			return cachedObject;
+		}
+		V2 peekObject() {
 			return cachedObject;
 		}
     }
@@ -133,7 +136,7 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 		final long stamp = lock.writeLock();
 
 		try {
-			CacheObject<K,V> co = new CacheObject<>(key, object, timeout);
+			final CacheObject<K,V> co = createCacheObject(key, object, timeout);
 			if (timeout != 0) {
 				existCustomTimeout = true;
 			}
@@ -147,6 +150,9 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 		}
 	}
 
+	protected CacheObject<K, V> createCacheObject(K key, V object, long timeout) {
+		return new CacheObject<>(key, object, timeout);
+	}
 
 	// ---------------------------------------------------------------- get
 
@@ -175,7 +181,7 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 		long stamp = lock.readLock();
 
 		try {
-			CacheObject<K,V> co = cacheMap.get(key);
+			final CacheObject<K,V> co = cacheMap.get(key);
 			if (co == null) {
 				missCount++;
 				return null;
@@ -193,7 +199,7 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 					stamp = lock.writeLock();
 				}
 
-				CacheObject<K,V> removedCo = cacheMap.remove(key);
+				final CacheObject<K,V> removedCo = cacheMap.remove(key);
 				if (removedCo != null) {
 					onRemove(removedCo.key, removedCo.cachedObject);
 				}
@@ -264,7 +270,7 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 		V removedValue = null;
 		final long stamp = lock.writeLock();
 		try {
-			CacheObject<K,V> co = cacheMap.remove(key);
+			final CacheObject<K,V> co = cacheMap.remove(key);
 
 			if (co != null) {
 				onRemove(co.key, co.cachedObject);
@@ -311,11 +317,15 @@ public abstract class AbstractCacheMap<K,V> implements Cache<K,V> {
 	 * {@inheritDoc}
 	 */
 	@Override
-	public Map<K, V> snapshot() {
+	public Map<K, V> snapshot(final boolean peek) {
 		final long stamp = lock.writeLock();
 		try {
-			Map<K, V> map = new HashMap<>(cacheMap.size());
-			cacheMap.forEach((key, cacheValue) -> map.put(key, cacheValue.getObject()));
+			final Map<K, V> map = new HashMap<>(cacheMap.size());
+			cacheMap.forEach((key, cacheValue) -> {
+				if (!cacheValue.isExpired()) {
+					map.put(key, peek ? cacheValue.peekObject() : cacheValue.getObject());
+				}
+			});
 			return map;
 		}
 		finally {

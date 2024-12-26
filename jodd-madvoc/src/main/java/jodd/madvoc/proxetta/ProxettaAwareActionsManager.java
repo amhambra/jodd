@@ -25,12 +25,12 @@
 
 package jodd.madvoc.proxetta;
 
-import jodd.cache.TypeCache;
 import jodd.madvoc.component.ActionsManager;
 import jodd.madvoc.config.ActionDefinition;
 import jodd.madvoc.config.ActionRuntime;
 import jodd.petite.meta.PetiteInject;
 import jodd.proxetta.Proxetta;
+import jodd.util.TypeCache;
 
 import java.lang.reflect.Method;
 
@@ -42,11 +42,7 @@ public class ProxettaAwareActionsManager extends ActionsManager {
 	@PetiteInject
 	protected ProxettaSupplier proxettaSupplier;
 
-	protected final TypeCache<Class> proxyActionClasses;
-
-	public ProxettaAwareActionsManager() {
-		this.proxyActionClasses = TypeCache.createDefault();
-	}
+	protected final TypeCache<Class> proxyActionClasses = TypeCache.<Class>create().threadsafe(true).get();
 
 	/**
 	 * Registers actions and applies proxetta on actions that are not already registered.
@@ -65,15 +61,11 @@ public class ProxettaAwareActionsManager extends ActionsManager {
 
 		// create proxy for action class if not already created
 
-		Class existing = proxyActionClasses.get(actionClass);
-
-		if (existing == null) {
+		final Class existing = proxyActionClasses.get(actionClass, (c) -> {
 			final Proxetta proxetta = proxettaSupplier.get();
 
-			existing = proxetta.proxy().setTarget(actionClass).define();
-
-			proxyActionClasses.put(actionClass, existing);
-		}
+			return proxetta.proxy().setTarget(c).define();
+		});
 
 		actionClass = existing;
 

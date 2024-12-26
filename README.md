@@ -2,44 +2,59 @@
 <br>
 
 [![GitHub release](https://img.shields.io/github/release/oblac/jodd.svg)](https://jodd.org)
-[![Build Status](https://img.shields.io/travis/oblac/jodd.svg)](https://travis-ci.org/oblac/jodd)
-[![codecov](https://codecov.io/gh/oblac/jodd/branch/master/graph/badge.svg)](https://codecov.io/gh/oblac/jodd)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/0ce3a0ae3667441fbbd261f6c9e043b0)](https://www.codacy.com/app/igo_rs/jodd)
-[![JitPack](https://jitpack.io/v/oblac/jodd.svg)](https://jitpack.io/#oblac/jodd)
 [![Stack Overflow](https://img.shields.io/badge/stack%20overflow-jodd-4183C4.svg)](https://stackoverflow.com/questions/tagged/jodd)
 [![BSD License](https://img.shields.io/badge/license-BSD--2--Clause-blue.svg)](https://jodd.org/license.html)
-[![Twitter](https://img.shields.io/twitter/url/https/github.com/oblac/jodd.svg?style=social)](https://twitter.com/intent/tweet?text=Hey,@joddorg%20is%20cool!&url=%5Bobject%20Object%5D)
-[![Help Contribute to Open Source](https://www.codetriage.com/oblac/jodd/badges/users.svg)](https://www.codetriage.com/oblac/jodd)
 
+## 👋 Hello!
 
-> We want to inspire the world to create. To use tech skills and build something truly... Awesome. Beautiful. Helpful. Impactful. Now you can produce lightweight code and focus on unleashing your full potential. Jodd is a set of developer-friendly and open-source Java micro-frameworks. It's designed to make things simple, but not simpler.
-
-+ Official web site (site & documentation): https://jodd.org
-+ Jodd micro-frameworks (30 min overview): https://joddframework.org
-+ Talk to Jodd via [gitter](https://gitter.im/oblac/jodd) or [slack](https://jodd.slack.com).
+Welcome to the **Jodd** - a unique, alternative world of Java :) You can find here some micro-frameworks and some handy tools. Nothing more, nothing less.
 
 <h4 align="center">Jodd = tools + ioc + mvc + db + aop + tx + json + html < 1.7 Mb</h4>
 
-# :zap: Jodd
+The official web-site: https://jodd.org
+
+# ‼️ THIS IS THE OLD MONOREPO. USE NEW JODD REPOS FOR v6+ ‼️
+
+**Jodd v6** is the maintained version, working on Java 8 and 11. The following components are promoted to version 6:
+
++ [jodd-util](https://github.com/oblac/jodd-util) ⭐
++ [jodd-mail](https://github.com/oblac/jodd-mail) ⭐
++ [jodd-json](https://github.com/oblac/jodd-json) ⭐
++ [jodd-lagarto](https://github.com/oblac/jodd-lagarto) ⭐
++ [jodd-http](https://github.com/oblac/jodd-http) ⭐
++ [jodd-props](https://github.com/oblac/jodd-props) ⭐
++ [jodd-petite](https://github.com/oblac/jodd-petite) ⭐
++ [jodd-proxetta](https://github.com/oblac/jodd-proxetta) ⭐
++ [jodd-db](https://github.com/oblac/jodd-db) ⭐
+
+The decision which component is promoted is based on the Maven Central Repo statistics. 
+
+Version **v5** contains remaining libraries and frameworks. They are in maintenance mode.
+
+Sorry, I can only do so much.
+
+---
+
+## :zap: Jodd
 
 **Jodd** is set of micro-frameworks and developer-friendly tools and utilities.
 
-_Use what you like._
+_Use what you like._ **Thank you.** 🙏
 
 **Cool libraries**:
 
-+ `jodd-json` - JSON parser and serializer.
-+ `jodd-lagarto` - HTML parser with `Jerry` and `CSSelly` and `Form` tag.
-+ `jodd-http` - tiny HTTP client.
-+ `jodd-mail` - for easier email sending.
++ `jodd-json` - JSON parser and serializer. ⭐
++ `jodd-lagarto` - HTML parser with `Jerry` and `CSSelly` and `Form` tag. ⭐
++ `jodd-http` - tiny HTTP client. ⭐
++ `jodd-mail` - for easier email sending. ⭐
 
 **Micro-frameworks**:
 
 + `jodd-madvoc` - slick MVC framework.
-+ `jodd-petite` - pragmatic DI container.
-+ `jodd-proxetta` - dynamic proxies and `Paramo`.
-+ `jodd-db` - thin database layer and object mapper.
-+ `jodd-jtx` - transactions management.
++ `jodd-petite` - pragmatic DI container. ⭐
++ `jodd-proxetta` - dynamic proxies and `Paramo`. ⭐
++ `jodd-db` - thin database layer and object mapper. ⭐
++ `jodd-jtx` - transactions management. ⭐
 
 **Less used tools**:
 
@@ -53,12 +68,12 @@ _Use what you like._
 
 **Utilities**:
 
-+ `jodd-core` - contains many utilities, including `JDateTime`.
-+ `jodd-bean` - our infamous `BeanUtil`, type inspectors and converters.
-+ `jodd-props` - is the super-replacement for Java `Properties`.
++ `jodd-core` - contains many every-day utilities. ⭐
++ `jodd-bean` - our infamous `BeanUtil`, type inspectors and converters. ⭐
++ `jodd-props` - is the super-replacement for Java `Properties`. ⭐
 + `jodd-servlet` - with many servlet utilities, including nice tag library.
 
-Read more in our [official documentation](http://jodd.org/doc).
+Read more in our [official documentation](http://jodd.org).
 
 ## :octocat: Building Jodd from source
 
@@ -66,38 +81,6 @@ Read more in our [official documentation](http://jodd.org/doc).
 targeting Java 1.8. You don't have to install anything,
 the only prerequisites are [Git](http://help.github.com/set-up-git-redirect)
 and Java JDK.
-
-### Check out sources
-
-Simply clone **Jodd** Git repo:
-
-    git clone https://github.com/oblac/jodd.git jodd
-
-### Compile and test, build jars
-
-You can build the Jodd project with:
-
-    gradlew build
-
-This will build all jars and run all unit tests.
-To skip the tests (for faster build), execute:
-
-    gradlew build -x test
-
-### Build full release with reports
-
-To generate _full release_, including running integration tests and generating various reports,
-you need [Docker](https://www.docker.com/) v1.12+.
-
-	docker-compose -f etc/docker-compose.yml up
-    gradlew clean release
-
-Integration tests requires some infrastructure (like databases), hence Docker is
-used.
-
-### Install Jodd into your local Maven
-
-    gradlew install
 
 ## :gift_heart: Contribute
 
@@ -107,7 +90,6 @@ First time only:
 
 + fork the **Jodd** repo (`upstream`) to your GitHub account (`origin`)
 + clone `origin` as your `local` repo
-+ install the [ZenHub](https://www.zenhub.com) plugin to track tasks
 
 Every other time:
 
@@ -120,3 +102,8 @@ Every other time:
 We will pickup up from there :)
 
 :rocket:
+
+## Code Contributors
+
+This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
+<a href="https://github.com/oblac/jodd/graphs/contributors"><img src="https://opencollective.com/jodd/contributors.svg?width=890&button=false" /></a>

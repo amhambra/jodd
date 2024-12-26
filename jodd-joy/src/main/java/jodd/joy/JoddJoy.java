@@ -27,14 +27,12 @@ package jodd.joy;
 
 import jodd.Jodd;
 import jodd.chalk.Chalk256;
-import jodd.log.Logger;
-import jodd.log.LoggerFactory;
-import jodd.log.LoggerProvider;
-import jodd.log.impl.SimpleLogger;
 import jodd.madvoc.WebApp;
 import jodd.madvoc.petite.PetiteWebApp;
 import jodd.petite.PetiteContainer;
-import jodd.util.function.Consumers;
+import jodd.util.Consumers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContext;
 import java.util.Objects;
@@ -102,25 +100,13 @@ public class JoddJoy {
 		return this;
 	}
 
-	// ---------------------------------------------------------------- logger
-
-	private Supplier<LoggerProvider> loggerProviderSupplier;
-
-	/**
-	 * Configures the logger provider.
-	 */
-	public JoddJoy withLoggerProvider(final Supplier<LoggerProvider> loggerProviderSupplier) {
-		this.loggerProviderSupplier = loggerProviderSupplier;
-		return this;
-	}
-
 	// ---------------------------------------------------------------- paths
 
 	private final JoyPaths joyPaths;
 
 	// ---------------------------------------------------------------- props
 
-	private JoyProps joyProps;
+	private final JoyProps joyProps;
 
 	private final Consumers<JoyPropsConfig> joyPropsConsumers = Consumers.empty();
 
@@ -146,7 +132,7 @@ public class JoddJoy {
 
 	// ---------------------------------------------------------------- proxetta
 
-	private JoyProxetta joyProxetta;
+	private final JoyProxetta joyProxetta;
 	private final Consumers<JoyProxettaConfig> joyProxettaConsumers = Consumers.empty();
 
 	/**
@@ -159,7 +145,7 @@ public class JoddJoy {
 
 	// ---------------------------------------------------------------- petite
 
-	private JoyPetite joyPetite;
+	private final JoyPetite joyPetite;
 
 	private final Consumers<JoyPetiteConfig> joyPetiteConsumers = Consumers.empty();
 
@@ -173,7 +159,7 @@ public class JoddJoy {
 
 	// ---------------------------------------------------------------- db
 
-	private JoyDb joyDb;
+	private final JoyDb joyDb;
 
 	private final Consumers<JoyDbConfig> joyDbConsumers = Consumers.empty();
 
@@ -218,23 +204,11 @@ public class JoddJoy {
 	 * Joy components.
 	 */
 	public JoddJoyRuntime start(final ServletContext servletContext) {
-		LoggerProvider loggerProvider = null;
-
-		if (loggerProviderSupplier != null) {
-			loggerProvider = loggerProviderSupplier.get();
-		}
-		if (loggerProvider == null) {
-			loggerProvider = SimpleLogger.PROVIDER;
-		}
-
-		LoggerFactory.setLoggerProvider(loggerProvider);
 		log = LoggerFactory.getLogger(JoddJoy.class);
 
 		printLogo();
 
 		log.info("Ah, Joy!");
-		log.info("Logging using: " + loggerProvider.getClass().getSimpleName());
-
 
 		joyPropsConsumers.accept(joyProps);
 		joyProxettaConsumers.accept(joyProxetta);
@@ -257,13 +231,15 @@ public class JoddJoy {
 			joyMadvoc.setServletContext(servletContext);
 			joyMadvoc.start();
 
+			printJoyConfiguration();
+
 			runJoyInitBeans();
 
 			// cleanup things we will not use
 
 			joyScanner.stop();
 		}
-		catch (Exception ex) {
+		catch (final Exception ex) {
 			if (log != null) {
 				log.error(ex.toString(), ex);
 			} else {
@@ -273,14 +249,6 @@ public class JoddJoy {
 			stop();
 			throw ex;
 		}
-
-		joyPetite.printBeans(100);
-		joyDb.printEntities(100);
-		joyMadvoc.printRoutes(100);
-
-		System.out.println(Chalk256.chalk().yellow().on("Joy") + " is up. Enjoy!");
-
-		log.info("Joy is up. Enjoy!");
 
 		if (joyDb.isDatabaseEnabled()) {
 			return new JoddJoyRuntime(
@@ -307,6 +275,16 @@ public class JoddJoy {
 		}
 	}
 
+	private void printJoyConfiguration() {
+		joyPetite.printBeans(100);
+		joyDb.printEntities(100);
+		joyMadvoc.printRoutes(100);
+
+		System.out.println(Chalk256.chalk().yellow().on("Joy") + " is up. Enjoy!");
+
+		log.info("Joy is up. Enjoy!");
+	}
+
 	/**
 	 * Prints a logo.
 	 */
@@ -323,7 +301,7 @@ public class JoddJoy {
 			joyDb.stop();
 			joyPetite.stop();
 		}
-		catch (Exception ignore) {
+		catch (final Exception ignore) {
 		}
 
 		if (log != null) {

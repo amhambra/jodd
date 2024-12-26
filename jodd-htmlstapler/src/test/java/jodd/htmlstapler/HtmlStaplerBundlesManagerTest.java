@@ -54,4 +54,25 @@ class HtmlStaplerBundlesManagerTest {
 
 		assertEquals(digest, digest2);
 	}
+
+	@Test
+	void testFixUrl() {
+		HtmlStaplerBundlesManager hsbm = new HtmlStaplerBundlesManager("/ctx", "/", RESOURCES_ONLY);
+		String fixedCss;
+
+		fixedCss = hsbm.fixCssRelativeUrls("@import url('/aaa/css?family=Roboto:300,400,500,700');", "/aaa.css");
+		assertEquals("@import url('/aaa/css?family=Roboto:300,400,500,700');", fixedCss);
+
+		fixedCss = hsbm.fixCssRelativeUrls("@import url('bbb/css?family=Roboto:300,400,500,700');", "/aaa/ccc.css");
+		assertEquals("@import url('../aaa/bbb/css?family=Roboto:300,400,500,700');", fixedCss);
+
+		fixedCss = hsbm.fixCssRelativeUrls("@import url('https://fonts.googleapis.com/css?family=Roboto:300,400,500,700');", "/");
+		assertEquals("@import url('https://fonts.googleapis.com/css?family=Roboto:300,400,500,700');", fixedCss);
+
+		fixedCss = hsbm.fixCssRelativeUrls("background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhE);", "/");
+		assertEquals("background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhE');", fixedCss);
+
+		fixedCss = hsbm.fixCssRelativeUrls("background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhE');", "/");
+		assertEquals("background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhE');", fixedCss);
+	}
 }

@@ -44,4 +44,6 @@ public @interface In {
 	 */
 	String value() default "";
 
+	String defaultValue() default "";
+
 }

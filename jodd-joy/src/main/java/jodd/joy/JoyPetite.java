@@ -25,17 +25,15 @@
 
 package jodd.joy;
 
-import jodd.cache.TypeCache;
 import jodd.chalk.Chalk256;
 import jodd.petite.AutomagicPetiteConfigurator;
 import jodd.petite.BeanDefinition;
 import jodd.petite.PetiteContainer;
 import jodd.petite.proxetta.ProxettaAwarePetiteContainer;
-import jodd.petite.scope.SessionScope;
-import jodd.petite.scope.SingletonScope;
 import jodd.util.ClassUtil;
+import jodd.util.Consumers;
 import jodd.util.StringUtil;
-import jodd.util.function.Consumers;
+import jodd.util.TypeCache;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,7 +74,7 @@ public class JoyPetite extends JoyBase implements JoyPetiteConfig {
 
 	private boolean autoConfiguration = true;
 	private boolean externalsCache = true;
-	private Consumers<PetiteContainer> petiteContainerConsumers = Consumers.empty();
+	private final Consumers<PetiteContainer> petiteContainerConsumers = Consumers.empty();
 
 	@Override
 	public JoyPetite disableAutoConfiguration() {
@@ -122,7 +120,7 @@ public class JoyPetite extends JoyBase implements JoyPetiteConfig {
 		if (!isWebApplication) {
 			// make session scope to act as singleton scope
 			// if this is not a web application (and http session is not available).
-			petiteContainer.registerScope(SessionScope.class, new SingletonScope(petiteContainer));
+			//petiteContainer.registerScope(SessionScope.class, new SingletonScope(petiteContainer));
 		}
 
 		// load parameters from properties files
@@ -133,7 +131,7 @@ public class JoyPetite extends JoyBase implements JoyPetiteConfig {
 			final AutomagicPetiteConfigurator automagicPetiteConfigurator =
 				new AutomagicPetiteConfigurator(petiteContainer);
 
-			automagicPetiteConfigurator.registerAsConsumer(joyScannerSupplier.get().getClassScanner());
+			automagicPetiteConfigurator.configure();
 		}
 
 		petiteContainerConsumers.accept(this.petiteContainer);
